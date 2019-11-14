@@ -4,6 +4,7 @@ using System.Text;
 using Utf8Json;
 namespace RamType0.JsonRpc
 {
+    [Obsolete]
     internal static class ObjectReceiveHelper
     {
         public static bool ReadIsValidJsonRpcMember(ref this JsonReader reader)
