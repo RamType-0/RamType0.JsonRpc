@@ -4,12 +4,15 @@ using System.Text;
 using Utf8Json;
 using System.Reflection.Emit;
 using System.Reflection;
+using System.Threading.Tasks;
+using RamType0.JsonRpc.Emit;
+using static RamType0.JsonRpc.Emit.MethodInvokerClassBuilder;
+
 namespace RamType0.JsonRpc
 {
     public class JsonRpcMethodDictionary
     {
-        static readonly ModuleBuilder moduleBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("JsonRpcMethodParamsResolvers"), AssemblyBuilderAccess.Run).DefineDynamicModule("JsonRpcMethodParamsResolvers");
-        public readonly struct Element
+              public readonly struct Element
         {
             public Element(Delegate function)
             {
@@ -19,45 +22,47 @@ namespace RamType0.JsonRpc
             static IJsonFormatter CreateFormatter(Delegate function)
             {
                 MethodInfo method = function.Method;
-                var returnType = method.ReturnType;
-                var parameters = method.GetParameters();
                 throw null!;
                 
             }
 
-            public static Type CreateParamsType(MethodInfo method)
-            {
-                var type = moduleBuilder.DefineType(method.Name + "Params", TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed | TypeAttributes.AutoLayout, typeof(ValueType));
-                var parameters = method.GetParameters();
-                var fields = new FieldBuilder[parameters.Length];
-                for (int i = 0; i < parameters.Length; i++)
-                {
-                    var parameter = parameters[i];
-                    fields[i] = type.DefineField(parameter.Name!, parameter.ParameterType, FieldAttributes.Public);
-                }
-                var invokeMethodParams = method.IsStatic ? Array.Empty<Type>() : new Type[] { method.DeclaringType! };
-                var invokeMethod = type.DefineMethod("Invoke", MethodAttributes.Public, method.ReturnType, invokeMethodParams);
-                var il = invokeMethod.GetILGenerator();
-                
-                foreach (var field in fields)
-                {
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldfld, field);
-                }
-                if (!method.IsStatic)
-                    il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Call, method);
-                return type.CreateType()!;
-                
-
-            }
-
+            
             
 
             public Delegate Method { get; }
             public IJsonFormatter Formatter { get; }
         }
         Dictionary<EscapedUTF8String, Delegate> Methods { get; } = new Dictionary<EscapedUTF8String, Delegate>();
-        
+
+       
+        public void InvokeAsync<T>(EscapedUTF8String methodName,ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+            where T:struct,IParamsObject
+        {
+            switch (reader.GetCurrentJsonToken())
+            {
+                case JsonToken.String:
+                    {
+                        var propNameSegment = reader.ReadPropertyNameSegmentRaw().AsSpan();
+                        if (propNameSegment.SequenceEqual(stackalloc byte[] {(byte)'p',(byte)'a',(byte)'r',(byte)'a',(byte)'m',(byte)'s', }))
+                        {
+                            
+                        }
+                        else if(propNameSegment.SequenceEqual(stackalloc byte[] {(byte)'i',(byte)'d' }))
+                        {
+                            //TODO:ReadIDAndInvokeVoidAsyncWithResponse
+                        }
+                        else
+                        {
+                            throw new FormatException();
+                            
+                        }
+                    }
+                case JsonToken.EndObject:
+                    {
+                        //TODO:InvokeNonParameterMethodWithoutResponse
+                    }
+            }
+            //TODO:params、idを全て読み進めてからreturnし、後続の処理は非同期実行
+        }
     }
 }

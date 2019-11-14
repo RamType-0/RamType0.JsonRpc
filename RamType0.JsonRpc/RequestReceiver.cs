@@ -11,6 +11,7 @@ namespace RamType0.JsonRpc
         public Task Resolve(ArraySegment<byte> json)
         {
             JsonSerializer.Deserialize<RequestReceiverObject>(json.Array, json.Offset);
+            throw new NotImplementedException();
         }
         public struct RequestReceiverObject
         {
@@ -44,8 +45,8 @@ namespace RamType0.JsonRpc
                 }
                     reader.ReadPropertyNameSegmentRaw().AsSpan().SequenceEqual(stackalloc byte[] { (byte)'m', (byte)'e', (byte)'t', (byte)'h', (byte)'o', (byte)'d', });
                     var methodName = EscapedUTF8String.Formatter.Instance.DeserializeUnsafe(ref reader);
-                    
-                }
+                throw new NotImplementedException();
+            }
 
             public void Serialize(ref JsonWriter writer, RequestReceiverObject value, IJsonFormatterResolver formatterResolver)
             {
