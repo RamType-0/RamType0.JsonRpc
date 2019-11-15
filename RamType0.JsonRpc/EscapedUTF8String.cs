@@ -10,6 +10,7 @@ namespace RamType0.JsonRpc
     /// エスケープ済みのJson内の文字列を表します。ヌル文字列はサポートされません。
     /// methodの名前の解決などに使います。
     /// </summary>
+    [JsonFormatter(typeof(EscapedUTF8String.Formatter))]
     public readonly struct EscapedUTF8String : IEquatable<EscapedUTF8String>
     {
         /// <summary>
@@ -107,7 +108,6 @@ namespace RamType0.JsonRpc
         }
         public sealed class Formatter : IJsonFormatter<EscapedUTF8String>
         {
-            public static Formatter Instance { get; } = new Formatter();
 
             public EscapedUTF8String Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
             {

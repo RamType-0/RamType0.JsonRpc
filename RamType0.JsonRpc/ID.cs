@@ -6,6 +6,7 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc
 {
+    [JsonFormatter(typeof(ID.Formatter))]
     public readonly struct ID : IEquatable<ID>
     {
         readonly private string? stringValue;

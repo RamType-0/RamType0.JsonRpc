@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using Utf8Json;
 namespace RamType0.JsonRpc
 {
-    class RequestReceiver
+    public class RequestReceiver
     {
         public Task Resolve(ArraySegment<byte> json)
         {
@@ -15,22 +16,43 @@ namespace RamType0.JsonRpc
         }
         public struct RequestReceiverObject
         {
-            //jsonrpc
-            public EscapedUTF8String Method { get; }
-            //params?
-            public ID? ID { get; }
+            public JsonRpcVersion jsonrpc;
+            public EscapedUTF8String method;
+            [IgnoreDataMember]
+            public DummyParams @params;
+            
+            public ID? id;
         }
+
+        public struct DummyParams
+        {
+            /*
+            class Formatter : IJsonFormatter<DummyParams>
+            {
+                public Formatter Instance { get; } = new Formatter();
+                public DummyParams Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+                {
+                    reader.ReadNextBlock();
+                    return default;
+                }
+
+                public void Serialize(ref JsonWriter writer, DummyParams value, IJsonFormatterResolver formatterResolver)
+                {
+                    throw new NotSupportedException();
+                }
+            }
+            */
+        }
+
+        
+
         /// <summary>
         /// 手法が邪悪すぎる
         /// </summary>
-        internal sealed class ResolvingFormatter : IJsonFormatter<RequestReceiverObject>
+        internal sealed class InvokingFormatter : IJsonFormatter<RequestReceiverObject>
         {
-            //[field: ThreadStatic]
-            //static ResolvingFormatter? instance;
-            /// <summary>
-            /// 状態を持たないので・・・
-            /// </summary>
-            internal static ResolvingFormatter Instance { get; } = new ResolvingFormatter();//=> instance ??= new ResolvingFormatter();
+            JsonRpcMethodDictionary JsonRpcMethodDictionary { get; }
+            internal static InvokingFormatter Instance { get; } = new InvokingFormatter();//=> instance ??= new ResolvingFormatter();
             /// <summary>
             /// 内部バッファを直接参照しているため、ここでreturnされるmethodNameは放っておくと勝手に書き換わります。即座に使用してください。
             /// </summary>
@@ -39,13 +61,52 @@ namespace RamType0.JsonRpc
             /// <returns></returns>
             public RequestReceiverObject Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
             {
-                if (!reader.ReadIsValidJsonRpcMember())
+                var copyReader = reader;
+                var requestReader = reader;
+                RequestReceiverObject request;
+                try
                 {
-                    //TODO:不正フォーマットレスポンス送信フラグを立てる
+                    request = formatterResolver.GetFormatter<RequestReceiverObject>().Deserialize(ref requestReader, formatterResolver);
                 }
-                    reader.ReadPropertyNameSegmentRaw().AsSpan().SequenceEqual(stackalloc byte[] { (byte)'m', (byte)'e', (byte)'t', (byte)'h', (byte)'o', (byte)'d', });
-                    var methodName = EscapedUTF8String.Formatter.Instance.DeserializeUnsafe(ref reader);
+                catch(JsonParsingException)
+                {
+                    //文法エラーなの？それとも型不一致？
+                    try
+                    {
+                        copyReader.ReadNextBlock();
+                        //正常にこのオブジェクトを読み飛ばせる=Jsonの文法はOK=InvalidRequest
+                        throw;
+                    }
+                    catch (JsonParsingException)
+                    {
+                        //正常にこのオブジェクトを読み飛ばせない=Jsonの文法がおかしい=ParseError
+                        throw;
+                    }
+                    
+                }
+                
+                copyReader.ReadIsBeginObjectWithVerify();
+                ReadOnlySpan<byte> paramsStr = stackalloc byte[] { (byte)'p', (byte)'a', (byte)'r', (byte)'a', (byte)'m', (byte)'s', };
+                try
+                {
+                    while (!copyReader.ReadPropertyNameSegmentRaw().AsSpan().SequenceEqual(paramsStr))
+                    {
+                        copyReader.ReadNextBlock();
+                    }
+                }
+                catch (JsonParsingException)
+                {
+                    //paramsが見つからない=InvalidRequest
+                }
+                //DeserializeParams
                 throw new NotImplementedException();
+
+
+            }
+
+            private static bool ReadIsMethodPropertyName(ref JsonReader reader)
+            {
+                return reader.ReadPropertyNameSegmentRaw().AsSpan().SequenceEqual(stackalloc byte[] { (byte)'m', (byte)'e', (byte)'t', (byte)'h', (byte)'o', (byte)'d', });
             }
 
             public void Serialize(ref JsonWriter writer, RequestReceiverObject value, IJsonFormatterResolver formatterResolver)
@@ -53,26 +114,6 @@ namespace RamType0.JsonRpc
                 throw new NotImplementedException();
             }
         }
-        sealed class FormatterResolver : IJsonFormatterResolver
-        {
-            internal static FormatterResolver Instance { get; } = new FormatterResolver();
-            public IJsonFormatter<T> GetFormatter<T>()
-            {
-                if(typeof(T) == typeof(RequestReceiverObject))
-                {
-                    return Unsafe.As<IJsonFormatter<T>> (ResolvingFormatter.Instance);
-                }
-                if(typeof(T) == typeof(ID))
-                {
-                    return Unsafe.As<IJsonFormatter<T>>(ID.Formatter.Instance);
-                }
-                if (typeof(T) == typeof(JsonRpcVersion))
-                {
-                    return Unsafe.As<IJsonFormatter<T>>(JsonRpcVersion.Formatter.Instance);
-                }
-
-                return JsonSerializer.DefaultResolver.GetFormatter<T>();
-            }
-        }
+       
     }
 }

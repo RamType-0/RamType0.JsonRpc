@@ -12,57 +12,134 @@ namespace RamType0.JsonRpc
 {
     public class JsonRpcMethodDictionary
     {
-              public readonly struct Element
-        {
-            public Element(Delegate function)
-            {
-                Method = function;
-                Formatter = CreateFormatter(function);
-            }
-            static IJsonFormatter CreateFormatter(Delegate function)
-            {
-                MethodInfo method = function.Method;
-                throw null!;
-                
-            }
-
-            
-            
-
-            public Delegate Method { get; }
-            public IJsonFormatter Formatter { get; }
-        }
         Dictionary<EscapedUTF8String, Delegate> Methods { get; } = new Dictionary<EscapedUTF8String, Delegate>();
 
        
-        public void InvokeAsync<T>(EscapedUTF8String methodName,ref JsonReader reader, IJsonFormatterResolver formatterResolver)
-            where T:struct,IParamsObject
+        public ID? Invoke(EscapedUTF8String methodName,ref JsonReader reader)
         {
-            switch (reader.GetCurrentJsonToken())
+            throw new NotImplementedException();
+        }
+
+   
+       abstract class InvokerBase<TParams>
+            where TParams:struct,IMethodParamsObject
+       {
+            /// <summary>
+            /// paramsとidを読み取ります。Requestオブジェクトの末端は読み取りません。
+            /// </summary>
+            /// <param name="reader"></param>
+            /// <param name="formatterResolver"></param>
+            /// <returns></returns>
+           protected static (TParams,ID?) ReadParamsAndID(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
             {
-                case JsonToken.String:
-                    {
-                        var propNameSegment = reader.ReadPropertyNameSegmentRaw().AsSpan();
-                        if (propNameSegment.SequenceEqual(stackalloc byte[] {(byte)'p',(byte)'a',(byte)'r',(byte)'a',(byte)'m',(byte)'s', }))
+                TParams paramsObj;
+                ID? id;
+                switch (reader.GetCurrentJsonToken())
+                {
+                    case JsonToken.String:
                         {
-                            
+                            var firstPropNameSegment = reader.ReadPropertyNameSegmentRaw().AsSpan();
+
+                            if (firstPropNameSegment.SequenceEqual(stackalloc byte[] { (byte)'p', (byte)'a', (byte)'r', (byte)'a', (byte)'m', (byte)'s', }))
+                            {
+                                paramsObj = ParamsFormatter<TParams>.Instance.Deserialize(ref reader, formatterResolver);
+                                switch (reader.GetCurrentJsonToken())
+                                {
+                                    case JsonToken.String:
+                                        {
+                                            if (reader.ReadPropertyNameSegmentRaw().AsSpan().SequenceEqual(stackalloc byte[] { (byte)'i', (byte)'d' }))
+                                            {
+                                                id = ID.Formatter.Instance.Deserialize(ref reader, formatterResolver);
+                                                return (paramsObj, id);
+                                            }
+                                            else
+                                            {
+                                                throw new FormatException();
+                                            }
+
+
+                                        }
+                                    case JsonToken.EndObject:
+                                        {
+                                            id = null;
+                                            return (paramsObj, id);
+                                        }
+                                    default:
+                                        {
+                                            throw new FormatException();
+                                        }
+                                }
+
+                            }
+                            else
+                            {
+                                if (default(TParams) is IEmptyParamsObject)//JIT時解決！！
+                                {
+                                    paramsObj = default;
+                                }
+                                else
+                                {
+                                    throw new FormatException();
+                                }
+
+                                if (firstPropNameSegment.SequenceEqual(stackalloc byte[] { (byte)'i', (byte)'d' }))
+                                {
+                                    id = ID.Formatter.Instance.Deserialize(ref reader, formatterResolver);
+                                    return (paramsObj, id);
+                                }
+                                else
+                                {
+                                    throw new FormatException();
+                                }
+
+
+                            }
+
+
                         }
-                        else if(propNameSegment.SequenceEqual(stackalloc byte[] {(byte)'i',(byte)'d' }))
+                    case JsonToken.EndObject:
                         {
-                            //TODO:ReadIDAndInvokeVoidAsyncWithResponse
+                            if (default(TParams) is IEmptyParamsObject)//JIT時解決！！
+                            {
+                                paramsObj = default;
+                            }
+                            else
+                            {
+                                throw new FormatException();
+                            }
+                            id = null;
+                            return (paramsObj, id);
                         }
-                        else
+                    default:
                         {
                             throw new FormatException();
-                            
                         }
-                    }
-                case JsonToken.EndObject:
-                    {
-                        //TODO:InvokeNonParameterMethodWithoutResponse
-                    }
+                }
             }
-            //TODO:params、idを全て読み進めてからreturnし、後続の処理は非同期実行
+            public abstract Task Invoke(ref JsonReader reader);
+            
+       }
+        sealed class VoidInvoker<T> : InvokerBase<T>
+            where T: struct, IMethodParamsObject
+        {
+            public override Task Invoke(ref JsonReader reader)
+
+            {
+                var (parameters, id) = ReadParamsAndID(ref reader, JsonSerializer.DefaultResolver);
+                reader.ReadIsEndObjectWithVerify();
+                if(id is null)
+                {
+                    return Task.Run(parameters.Invoke);//TODO:ここで関数オブジェクト生成されてるがどうにもならなそう
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                    return Task.Run(parameters.Invoke);
+                }
+
+            }
         }
+
+
     }
 }
