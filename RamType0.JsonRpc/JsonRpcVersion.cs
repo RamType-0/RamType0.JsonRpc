@@ -2,7 +2,7 @@
 using Utf8Json;
 namespace RamType0.JsonRpc
 {
-    [JsonFormatter(typeof(JsonRpcVersion.Formatter))]
+    [JsonFormatter(typeof(Formatter))]
     public readonly struct JsonRpcVersion
     {
         public sealed class Formatter : IJsonFormatter<JsonRpcVersion>
@@ -10,30 +10,22 @@ namespace RamType0.JsonRpc
             //public static Formatter Instance { get; } = new Formatter();
             public JsonRpcVersion Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
             {
-                EnsureVersion(ref reader);
+                ReadIsVersion2WithVerify(ref reader);
                 return default;
             }
 
-            private static void EnsureVersion(ref JsonReader reader)
+            private static void ReadIsVersion2WithVerify(ref JsonReader reader)
             {
+                var copy = reader;
                 if (!ReadIsVersion2(ref reader))
                 {
-                    ThrowJsonRpcFormatException();
+                    
+                    ThrowJsonRpcFormatException(copy.ReadString());
                 }
 
             }
 
-            public static void ReadIsValidJsonRpcPropertyWithVerify(ref JsonReader reader)
-            {
-                if (ReadIsValidJsonRpcProperty(ref reader))
-                {
-                    return;
-                }
-                else
-                {
-                    ThrowJsonRpcFormatException();
-                }
-            }
+
 
             private static bool ReadIsValidJsonRpcProperty(ref JsonReader reader)
             {
@@ -61,9 +53,32 @@ namespace RamType0.JsonRpc
 
             }
 
-            private static void ThrowJsonRpcFormatException()
+            private static void ThrowJsonRpcFormatException(string actualValue)
             {
-                throw new FormatException("JSON-RPCオブジェクトのバージョンが不正です。");
+                throw new JsonParsingException($"Invalid version of JsonRpc. Expected:\"2.0\" Actual : \"{actualValue}\"");
+            }
+            /// <summary>
+            /// Deserializeを通じて正しい
+            /// </summary>
+            public sealed class Nullable : IJsonFormatter<JsonRpcVersion?>
+            {
+                public JsonRpcVersion? Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+                {
+                    if (reader.ReadIsNull())
+                    {
+                        return null;
+                    }
+                    else
+                    {
+                        ReadIsVersion2WithVerify(ref reader);
+                        return default(JsonRpcVersion);
+                    }
+                }
+
+                public void Serialize(ref JsonWriter writer, JsonRpcVersion? value, IJsonFormatterResolver formatterResolver)
+                {
+                    throw new NotSupportedException();
+                }
             }
         }
     }

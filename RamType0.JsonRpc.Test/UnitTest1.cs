@@ -2,9 +2,12 @@ using NUnit.Framework;
 using RamType0.JsonRpc;
 using System;
 using RamType0.JsonRpc.Emit;
-using static RamType0.JsonRpc.Emit.MethodInvokerClassBuilder;
+using static RamType0.JsonRpc.Emit.MethodParamsTypeBuilder;
 using Utf8Json;
 using Utf8Json.Resolvers;
+using System.Diagnostics;
+using System.Threading.Tasks;
+using System.Text;
 
 namespace RamType0.JsonRpc.Test
 {
@@ -13,13 +16,13 @@ namespace RamType0.JsonRpc.Test
         [SetUp]
         public void Setup()
         {
-         
+            
         }
 
         [Test]
         public void Test1()
         {
-            var paramsType = MethodInvokerClassBuilder.CreateType<Func<object,object,bool>>(ReferenceEquals,"t1");
+            var paramsType = MethodParamsTypeBuilder.CreateParamsType<Func<object,object,bool>>(ReferenceEquals,"t1");
             using (dynamic paramsObj = Activator.CreateInstance(paramsType))
             {
                 paramsObj.objA = paramsObj.objB = null;
@@ -30,7 +33,7 @@ namespace RamType0.JsonRpc.Test
         [Test]
         public void Test2()
         {
-            var paramsType = MethodInvokerClassBuilder.CreateType<Func<int,int>>(1.CompareTo,"t2");
+            var paramsType = MethodParamsTypeBuilder.CreateParamsType<Func<int,int>>(1.CompareTo,"t2");
             using (var paramsObj = (IMethodParamsObject<int>)Activator.CreateInstance(paramsType))
             {
                 ((dynamic)paramsObj).value = 2;
@@ -42,24 +45,24 @@ namespace RamType0.JsonRpc.Test
         [Test]
         public void Test3()
         {
-            var paramsType = MethodInvokerClassBuilder.CreateType<Func<string>>("".ToString,"");
+            var paramsType = MethodParamsTypeBuilder.CreateParamsType<Func<string>>("".ToString,"");
             IMethodParamsObject<string> paramsObj = (IMethodParamsObject<string>)Activator.CreateInstance(paramsType);
             Assert.AreEqual("", paramsObj.Invoke());
             Assert.IsTrue(paramsObj is IEmptyParamsObject);
             paramsObj.Dispose();
-            Assert.IsNull( paramsObj.Invoke());
+            Assert.Throws<NullReferenceException>(()=>paramsObj.Invoke());
             
             
         }
         [Test]
         public void Test4()
         {
-            var paramsType = MethodInvokerClassBuilder.CreateType<Func<int, int>>(1.CompareTo,"t4");
+            var paramsType = MethodParamsTypeBuilder.CreateParamsType<Func<int, int>>(1.CompareTo,"t4");
             var paramsObj = (IMethodParamsObject<int>)Activator.CreateInstance(paramsType);
 
             ((dynamic)paramsObj).value = 0;
             paramsObj.Dispose();
-            Assert.AreEqual(0, paramsObj.Invoke());
+            Assert.Throws<NullReferenceException>(() => paramsObj.Invoke());
             Assert.IsFalse(paramsObj is IEmptyParamsObject);
 
 
@@ -74,8 +77,151 @@ namespace RamType0.JsonRpc.Test
         public void Utf8JsonTest2()
         {
             
-            var s = JsonSerializer.Deserialize<RequestReceiver.RequestReceiverObject>("{\"jsonrpc\":\"2.0\"}");
+            var s = JsonSerializer.Deserialize<RequestReceiverObject>("{\"jsonrpc\":\"2.0\"}");
 
+        }
+
+
+        [Test]
+        public void RpcDicTest()
+        {
+
+            var dic = new JsonRpcMethodDictionary();
+            dic.Register<Action<string>>("log", (str) => Debug.WriteLine(str));
+            dic.Register<Action>("none", () => { });
+            RequestReceiver receiver = CreateReceiver(dic);
+            receiver.Resolve(
+                "{\"jsonrpc\":\"2.0\"," +
+                "\"params\":{\"str\":\"Hello\"}," +
+                "\"method\":\"log\"," +
+                "\"id\":\"asd\"" +
+                "}"
+                );
+            receiver.Resolve(
+                "{\"jsonrpc\":\"2.0\"," +
+                "\"params\":{\"str\":\"World!\"}," +
+                "\"method\":\"none\"," +
+                "\"id\":\"3\"" +
+                "}"
+                );
+        }
+
+        private static RequestReceiver CreateReceiver(JsonRpcMethodDictionary dic)
+
+        {
+            
+            var responser = new DefaultResponser(Console.OpenStandardOutput());
+            var receiver = new RequestReceiver(dic, responser, JsonSerializer.DefaultResolver);
+            return receiver;
+        }
+
+        [Test]
+        public void RpcDic10MReq()
+        {
+            var dic = new JsonRpcMethodDictionary();
+
+            dic.Register<Func<string,string>>("log1", (str) => { return str; });
+            //var tasks = new Task[10000000];
+            var receiver = CreateReceiver(dic);
+            var bytes = Encoding.UTF8.GetBytes(
+                "{\"jsonrpc\":\"2.0\"," +
+                "\"params\":[\"10MegaShock!!!\"]," +
+                "\"method\":\"log1\"," +
+                "\"id\":1" +
+                "}");
+            for (int i = 0; i < 10_000_000; i++)
+            {
+                receiver.Resolve(bytes);
+            }
+            //Task.WaitAll(tasks);
+            
+        }
+
+      
+        [Test]
+        public void RpcDic10MNotification()
+        {
+            var dic = new JsonRpcMethodDictionary();
+
+            dic.Register<Func<string, string>>("log2", (str) => {  return str; });
+
+            var receiver = CreateReceiver(dic);
+            //var tasks = new Task[10000000];
+            var bytes = Encoding.UTF8.GetBytes(
+                "{\"jsonrpc\":\"2.0\"," +
+                "\"params\":[\"10MegaShock!!!\"]," +
+                "\"method\":\"log2\"" +
+                "}");
+            for (int i = 0; i < 10_000_000; i++)
+            {
+                receiver.Resolve(bytes );
+            }
+            //Task.WaitAll(tasks);
+        }
+
+        [Test]
+        public void RpcDic1MInvalidJson()
+        {
+            var dic = new JsonRpcMethodDictionary();
+
+            dic.Register<Func<string, string>>("log3", (str) => { return str; });
+
+            var receiver = CreateReceiver(dic);
+            var tasks = new Task[1000000];
+            var bytes = Encoding.UTF8.GetBytes(
+                //"{\"jsonrpc\":\"2.0\"," +
+                "\"params\":[\"1MegaShock!!!\"]," +
+                "\"method\":\"log3\"" +
+                "}");
+            for (int i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = receiver.Resolve(bytes);
+            }
+            Task.WaitAll(tasks);
+        }
+
+        [Test]
+        public void RpcDic1MMissingJsonRpc()
+        {
+            var dic = new JsonRpcMethodDictionary();
+
+            dic.Register<Func<string, string>>("log4", (str) => { return str; });
+
+            var receiver = CreateReceiver(dic);
+            var tasks = new Task[1000000];
+            var bytes = Encoding.UTF8.GetBytes(
+                "{"+
+                //"\"jsonrpc\":\"2.0\"," +
+                "\"params\":[\"1MegaShock!!!\"]," +
+                "\"method\":\"log4\"" +
+                "}");
+            for (int i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = receiver.Resolve(bytes);
+            }
+            Task.WaitAll(tasks);
+        }
+
+        [Test]
+        public void RpcDic1MInvalidJsonRpc()
+        {
+            var dic = new JsonRpcMethodDictionary();
+
+            dic.Register<Func<string, string>>("log5", (str) => { return str; });
+
+            var receiver = CreateReceiver(dic);
+            var tasks = new Task[1000000];
+            var bytes = Encoding.UTF8.GetBytes(
+                "{" +
+                "\"jsonrpc\":\"1.0\"," +
+                "\"params\":[\"1MegaShock!!!\"]," +
+                "\"method\":\"log5\"" +
+                "}");
+            for (int i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = receiver.Resolve(bytes);
+            }
+            Task.WaitAll(tasks);
         }
 
     }

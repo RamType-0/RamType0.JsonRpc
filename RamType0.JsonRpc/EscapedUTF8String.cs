@@ -10,7 +10,7 @@ namespace RamType0.JsonRpc
     /// エスケープ済みのJson内の文字列を表します。ヌル文字列はサポートされません。
     /// methodの名前の解決などに使います。
     /// </summary>
-    [JsonFormatter(typeof(EscapedUTF8String.Formatter))]
+    [JsonFormatter(typeof(Formatter.Persistent))]
     public readonly struct EscapedUTF8String : IEquatable<EscapedUTF8String>
     {
         /// <summary>
@@ -90,7 +90,13 @@ namespace RamType0.JsonRpc
                     return (GetElementUnsafeAs<ulong>(span) ^ GetElementUnsafeAs<ulong>(span, length - 8)).GetHashCode();
             }
         }
+        private EscapedUTF8String Clone()
+        {
+            var array = new byte[value.Count];
+            Buffer.BlockCopy(value.Array!, value.Offset, array, 0, array.Length);
 
+            return FromEscapedQuoted(array);
+        }
         private static T GetElementUnsafeAs<T>(ReadOnlySpan<byte> span,int index = 0)
             where T:unmanaged
         {
@@ -106,40 +112,130 @@ namespace RamType0.JsonRpc
         {
             return !(left == right);
         }
-        public sealed class Formatter : IJsonFormatter<EscapedUTF8String>
+        public static class Formatter
         {
-
-            public EscapedUTF8String Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+            public static EscapedUTF8String DeserializeSafe(ref JsonReader reader)
             {
-                var quoted = DeserializeUnsafe(ref reader).value;
-                var array = new byte[quoted.Count];
-                Buffer.BlockCopy(quoted.Array!, quoted.Offset, array, 0, array.Length);
-
-                return FromEscapedQuoted(array);
+                return DeserializeUnsafe(ref reader).Clone();
             }
 
-            /// <summary>
-            /// Utf8Jsonの内部バッファをそのまま参照しているため、ヒープに保存したりすると勝手に書き換わります。即座に使用してください。
-            /// </summary>
-            /// <param name="reader"></param>
-            /// <returns></returns>
-            public EscapedUTF8String DeserializeUnsafe(ref JsonReader reader)
+            public static EscapedUTF8String? DeserializeNullableSafe(ref JsonReader reader)
+            {
+                if (reader.ReadIsNull())
+                {
+                    return null;
+                }
+                else
+                {
+                    return DeserializeSafe(ref reader);
+                }
+            }
+
+            public static EscapedUTF8String DeserializeUnsafe(ref JsonReader reader)
             {
                 var unQuoted = reader.ReadStringSegmentRaw();
                 var quoted = new ArraySegment<byte>(unQuoted.Array!, unQuoted.Offset - 1, unQuoted.Count + 2);
                 return new EscapedUTF8String(quoted);
             }
-
-            public void Serialize(ref JsonWriter writer, EscapedUTF8String value, IJsonFormatterResolver formatterResolver)
+            private static void Serialize(ref JsonWriter writer, EscapedUTF8String value)
             {
                 writer.EnsureCapacity(value.Length);
                 foreach (var c in value.value)
                 {
                     writer.WriteRawUnsafe(c);
                 }
+
+            }
+            private static EscapedUTF8String? DeserializeNullableUnsafe(ref JsonReader reader)
+            {
+                if (reader.ReadIsNull())
+                {
+                    return null;
+                }
+                else
+                {
+                    return DeserializeUnsafe(ref reader);
+                }
+            }
+            private static void SerializeNullable(ref JsonWriter writer, EscapedUTF8String? value)
+            {
+                if (value is EscapedUTF8String str)
+                {
+                    Serialize(ref writer, str);
+                }
+                else
+                {
+                    writer.WriteNull();
+                }
+
+            }
+            public sealed class Temp : IJsonFormatter<EscapedUTF8String>
+            {
+
                 
+
+                public EscapedUTF8String Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+                {
+                    return DeserializeUnsafe(ref reader);
+                }
+                /// <summary>
+                /// Utf8Jsonの内部バッファをそのまま参照しているため、ヒープに保存したりすると勝手に書き換わります。即座に使用してください。
+                /// </summary>
+                /// <param name="reader"></param>
+                /// <returns></returns>
+                
+
+                public void Serialize(ref JsonWriter writer, EscapedUTF8String value, IJsonFormatterResolver formatterResolver)
+                {
+                    Formatter.Serialize(ref writer, value);
+
+                }
+
+                
+                public sealed class Nullable : IJsonFormatter<EscapedUTF8String?>
+                {
+                    public EscapedUTF8String? Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+                    {
+                        return DeserializeNullableUnsafe(ref reader);
+                    }
+
+                    
+
+                    public void Serialize(ref JsonWriter writer, EscapedUTF8String? value, IJsonFormatterResolver formatterResolver)
+                    {
+                        SerializeNullable(ref writer, value);
+                    }
+
+                    
+                }
+            }
+            public sealed class Persistent : IJsonFormatter<EscapedUTF8String>
+            {
+                public EscapedUTF8String Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+                {
+                    return DeserializeSafe(ref reader);
+                }
+
+                public void Serialize(ref JsonWriter writer, EscapedUTF8String value, IJsonFormatterResolver formatterResolver)
+                {
+                    Formatter.Serialize(ref writer, value);
+                }
+                public sealed class Nullable : IJsonFormatter<EscapedUTF8String?>
+                {
+                    public EscapedUTF8String? Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+                    {
+                        return DeserializeNullableSafe(ref reader);
+                    }
+
+                    public void Serialize(ref JsonWriter writer, EscapedUTF8String? value, IJsonFormatterResolver formatterResolver)
+                    {
+                        SerializeNullable(ref writer, value);
+                    }
+                }
             }
         }
+        
+        
         public static implicit operator EscapedUTF8String(string text)
         {
             return FromUnEscaped(text);

@@ -65,14 +65,9 @@ namespace RamType0.JsonRpc
         {
             return !(left == right);
         }
-        internal sealed class Formatter : IJsonFormatter<ID>
+        public sealed class Formatter : IJsonFormatter<ID>
         {
-            //[field: ThreadStatic]
-            //static Formatter? instance;
-            /// <summary>
-            /// 状態を持たないので複数スレッドから同時に呼ばれてもOK
-            /// </summary>
-            internal static Formatter Instance { get; } = new Formatter();//=> instance ??= new Formatter();
+
             public ID Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
             {
                 switch (reader.GetCurrentJsonToken())
@@ -83,11 +78,16 @@ namespace RamType0.JsonRpc
                     case JsonToken.String:
                         return new ID(reader.ReadString());
                     default:
-                        throw new FormatException();
+                        throw new JsonParsingException("Expected number or string");
                 }
             }
 
             public void Serialize(ref JsonWriter writer, ID value, IJsonFormatterResolver formatterResolver)
+            {
+                Serialize(ref writer, value);
+            }
+
+            public static void Serialize(ref JsonWriter writer, ID value)
             {
                 var str = value.stringValue;
                 if (str is null)
@@ -99,7 +99,40 @@ namespace RamType0.JsonRpc
                     writer.WriteString(str);
                 }
             }
+            public sealed class Nullable : IJsonFormatter<ID?>
+            {
+
+                public ID? Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+                {
+                    switch (reader.GetCurrentJsonToken())
+                    {
+
+                        case JsonToken.Number:
+                            return new ID(reader.ReadInt64());
+                        case JsonToken.String:
+                            return new ID(reader.ReadString());
+                        case JsonToken.Null:
+                            return null;
+                        default:
+                            throw new JsonParsingException("Expected number or string or null");
+                    }
+                }
+
+                public void Serialize(ref JsonWriter writer, ID? value, IJsonFormatterResolver formatterResolver)
+                {
+                    if (value is ID id)
+                    {
+                        Formatter.Serialize(ref writer, id);
+                    }
+                    else
+                    {
+                        writer.WriteNull();
+                    }
+                }
+            }
         }
+
+       
     }
     
 }
