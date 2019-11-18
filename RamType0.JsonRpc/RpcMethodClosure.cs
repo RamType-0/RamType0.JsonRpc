@@ -6,6 +6,7 @@ using RamType0.JsonRpc.Emit;
 
 namespace RamType0.JsonRpc
 {
+
     /// <summary>
     /// ラムダ式使ってFunc作るときに作られるクロージャをカスタム実装してプーリング！
     /// </summary>
@@ -38,7 +39,7 @@ namespace RamType0.JsonRpc
             InjectParams(responser, parameters, id);
         }
 
-        static Func<RpcMethodClosure<T>> GetFactory()
+        static Func<RpcMethodClosure<T>> GetFactory()//TODO:Rpcに限らないクロージャプーリングにしたい・・・IFactoryProviderみたいなのでいけそうだけど仰々しい気もする
         {
             var interfaces = typeof(T).GetInterfaces();
             foreach (var i in interfaces)
@@ -67,15 +68,32 @@ namespace RamType0.JsonRpc
 
         protected static ConcurrentBag<RpcMethodClosure<T>>? Pool { get; private set; } = new ConcurrentBag<RpcMethodClosure<T>>();
 
-        /// <summary>
-        /// プーリング機構を破棄し、プーリングに使われるリソースを開放します。GetClosure自体は有効のままになります。
-        /// </summary>
-        public static void Dispose()
+
+        public static bool PoolingEnabled
         {
-            Pool = null;
+            get
+            {
+                return !(Pool is null);
+            }
+
+            set
+            {
+                if(value)
+                {
+                    if(Pool is null)
+                    {
+                        Pool = new ConcurrentBag<RpcMethodClosure<T>>();
+                    }
+                }
+                else
+                {
+                    Pool = null;
+                }
+            }
         }
         /// <summary>
         /// プーリング機構が破棄されていない場合、プールされている全てのクロージャを開放します。プーリング機構が破棄されていた場合、何も行いません。
+        /// このメソッドを呼び出した時点で使用中のクロージャはこのメソッドの呼び出し後に<see cref="Pool"/>に保持されることに注意してください。
         /// </summary>
         public static void ReleasePooledClosures()
         {
@@ -85,7 +103,7 @@ namespace RamType0.JsonRpc
         public IResponser Responser { get; private set; } = default!;
         public T Params { get; private set; }
         public ID? ID { get; private set; }
-        protected abstract void Invoke();
+        protected abstract void Invoke();//仮想呼び出しをやめたいと思ったがどっちみちDelegate経由するので変わらない
         public Action InvokeAction { get; }
     }
     sealed class VoidRpcMethodClosure<T> : RpcMethodClosure<T>
@@ -107,14 +125,14 @@ namespace RamType0.JsonRpc
                 {
                     if (ID is ID requestID)
                     {
-                        Responser.Response(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                        Responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
                     }
                     return;
                 }
                 {
                     if (ID is ID requestID)
                     {
-                        Responser.Response(ResultResponse.Result(requestID));
+                        Responser.ResponseResult(ResultResponse.Result(requestID));
                     }
                 }
             }
@@ -145,14 +163,14 @@ namespace RamType0.JsonRpc
                 {
                     if (ID is ID requestID)
                     {
-                        Responser.Response(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                        Responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
                     }
                     return;
                 }
                 {
                     if (ID is ID requestID)
                     {
-                        Responser.Response(new ResultResponse<TResult>(requestID, result));
+                        Responser.ResponseResult(new ResultResponse<TResult>(requestID, result));
                     }
                 }
             }
@@ -162,4 +180,6 @@ namespace RamType0.JsonRpc
             }
         }
     }
+
+
 }

@@ -190,18 +190,18 @@ namespace RamType0.JsonRpc
                     if (readerOffset >= jsonTerminal)//1個分丸ごとスキップ、さらに空白もスキップした後にまだ終端に達していなかったらおかしい
                     //Jsonの文法はOK=InvalidRequest
                     {
-                        return Task.Run(() => responser.Response(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment))));//TODO:ここもクロージャプーリングする
+                        return Task.Run(() => responser.ResponseError(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment))));//TODO:ここもクロージャプーリングする
                     }
                     else
                     {
-                        return Task.Run(() => responser.Response(ErrorResponse.ParseError(ex)));
+                        return Task.Run(() => responser.ResponseException(ErrorResponse.ParseError(ex)));
                     }
                     
                 }
                 catch (JsonParsingException e)
                 {
                     //正常にこのオブジェクトを読み飛ばせない=Jsonの文法がおかしい=ParseError
-                    return Task.Run(() => responser.Response(ErrorResponse.ParseError(e)));//TODO:ここもクロージャプーリングする
+                    return Task.Run(() => responser.ResponseException(ErrorResponse.ParseError(e)));//TODO:ここもクロージャプーリングする
                 }
 
             }
@@ -214,12 +214,12 @@ namespace RamType0.JsonRpc
                 }
                 else
                 {
-                    return Task.Run(() => responser.Response(new ErrorResponse(request.id, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing."))));
+                    return Task.Run(() => responser.ResponseError(new ErrorResponse(request.id, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing."))));
                 }
             }
             else
             {
-                return Task.Run(() => responser.Response(new ErrorResponse(request.id, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing."))));
+                return Task.Run(() => responser.ResponseError(new ErrorResponse(request.id, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing."))));
             }
 
 

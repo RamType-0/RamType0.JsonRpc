@@ -18,43 +18,128 @@ namespace RamType0.JsonRpc
         Stream Output { get; }
         public object OutputWritingLocker { get; } = new object();
 
-        public void Response<T>(T response) where T : struct, IResponse
+        void Response<T>(T response) where T :  IResponseMessage
         {
             lock (OutputWritingLocker)
             {
                 JsonSerializer.Serialize(Output, response);
             }
         }
+
+        void IResponser.Response<T>(T response)
+        {
+            Response(response);
+        }
     }
 
     /// <summary>
-    /// <see cref="Response{T}(T)"/>を様々な形で実装することで、ヘッダーの付与などがサポートされます。
+    /// 最終的な<see cref="IResponseMessage"/>の出力を行うクラスを示します。
     /// </summary>
     public interface IResponser
     {
-        void Response<T>(T response) where T : struct, IResponse;
+        protected void Response<T>(T response) where T : IResponseMessage;
+        public void ResponseResult<TResult>(ResultResponse<TResult> response)
+        {
+            Response(response);
+        }
+
+        public void ResponseResult(ResultResponse response)
+        {
+            Response(response);
+        }
+        /// <summary>
+        /// できる限り<see cref="ResponseException{TResponse, TError}(TResponse)"/>を利用してください。
+        /// </summary>
+        /// <typeparam name="TResponse"></typeparam>
+        /// <typeparam name="TError"></typeparam>
+        /// <param name="response"></param>
+        protected internal void ResponseError<TResponse>(TResponse response) where TResponse : IErrorResponse
+        {
+            Response(response);
+        }
+        /// <summary>
+        /// <see cref="OperationCanceledException"/>など特殊な例外に対して別のエラーコードを割り振りたい場合にオーバーライドしてください。
+        /// </summary>
+        /// <typeparam name="TResponse"></typeparam>
+        /// <typeparam name="TError"></typeparam>
+        /// <param name="response"></param>
+        public void ResponseException<T>(T response)where T:IErrorResponse<Exception>
+        {
+            Response(response);
+        }
     }
 
-  
-    public interface IResponse
+
+    /// <summary>
+    /// iMessageはApple Inc.の登録商標です
+    /// </summary>
+    public interface IMessage
     {
-
+        JsonRpcVersion jsonrpc { get; }
     }
-    interface IErrorResponse : IResponse
+    public interface IResponseMessage : IMessage
     {
-
+        ID? id { get; set; }
+    }
+    public interface IErrorResponse : IResponseMessage
+    {
+        ErrorObject error { get; set; }
     }
 
-    interface IResultResponse :IResponse{ }
+    public interface IErrorResponse<T> :IErrorResponse
+        where T : notnull
+    {
+        new ErrorObject<T> error { get; set; }
+        ErrorObject IErrorResponse.error
+        {
+            get
+            {
+                return new ErrorObject(error.code, error.message);
+            }
+
+            set
+            {
+                var newError = error;
+                newError.code = value.code;
+                newError.message = value.message;
+                error = newError;
+            }
+        }
+    }
+
+    interface IResultResponse<out T> :IResultResponse
+    {
+        T result { get; }
+        //object? IResultResponse.result => result;
+    }
+
+    interface IResultResponse : IResponseMessage
+    {
+        //object? result { get; }
+    }
+
+    interface IErrorObject
+    {
+        public long code { get; set; }
+        public string message { get; set; }
+    }
+
+    interface IErrorObject<out T> : IErrorObject
+    {
+        T data { get; }
+    }
+
     /// <summary>
     /// 戻り値を持ったJsonRpcメソッドが正常に完了した際の応答を示します。
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public readonly struct ResultResponse<T> : IResultResponse
+    public struct ResultResponse<T> : IResultResponse<T>
     {
-        public readonly JsonRpcVersion jsonrpc;
-        public readonly T result;
-        public readonly ID id;
+        public JsonRpcVersion jsonrpc => default;
+        public T result { get; set; }
+        public ID id { get; set; }
+
+        ID? IResponseMessage.id { get => id; set => id = value ?? throw new InvalidOperationException(); }
 
         internal ResultResponse(ID id, T result) : this()
         {
@@ -65,11 +150,16 @@ namespace RamType0.JsonRpc
     /// <summary>
     /// 戻り値を持たないJsonRpcメソッドが正常に完了した際の応答を示します。
     /// </summary>
-    public readonly struct ResultResponse : IResultResponse
+    public struct ResultResponse : IResultResponse<ResultResponse.VoidMethodResult>
     {
-        public readonly JsonRpcVersion jsonrpc;
-        public readonly object? result;
-        public readonly ID id;
+        public JsonRpcVersion jsonrpc => default;
+        /// <summary>
+        /// nullとしてシリアライズさせるためのダミーです
+        /// </summary>
+        public VoidMethodResult result => default;
+        public ID id { get; set; }
+
+        ID? IResponseMessage.id { get => id; set => id = value ?? throw new InvalidOperationException(); }
 
         ResultResponse(ID id) : this()
         {
@@ -83,15 +173,36 @@ namespace RamType0.JsonRpc
         {
             return new ResultResponse(id);
         }
+        [JsonFormatter(typeof(Formatter))]
+        public readonly struct VoidMethodResult
+        {
+            public sealed class Formatter : IJsonFormatter<VoidMethodResult>
+            {
+                public VoidMethodResult Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+                {
+                    if (!reader.ReadIsNull())
+                    {
+                        throw new JsonParsingException($"Expected null,but \"{Encoding.UTF8.GetString(reader.ReadNextBlockSegment())}\"");
+                    }
+                    return default;
+                }
+
+                public void Serialize(ref JsonWriter writer, VoidMethodResult value, IJsonFormatterResolver formatterResolver)
+                {
+                    writer.WriteNull();
+                    
+                }
+            }
+        }
     }
 
-    public readonly struct ErrorResponse<T> : IErrorResponse
+    public struct ErrorResponse<T> : IErrorResponse<T>
         where T:notnull
     {
-        public readonly JsonRpcVersion jsonrpc;
+        public JsonRpcVersion jsonrpc => default;
         [JsonFormatter(typeof(ID.Formatter.Nullable))]
-        public readonly ID? id;
-        public readonly ErrorObject<T> error;
+        public ID? id { get; set; }
+        public ErrorObject<T> error { get; set; }
 
         internal ErrorResponse(ID? id, ErrorObject<T> error) : this()
         {
@@ -116,12 +227,12 @@ namespace RamType0.JsonRpc
         //RequestCancelled = -32800,
         //ContentModified = -32801,
     }
-    public readonly struct ErrorObject<T>
+    public struct ErrorObject<T> : IErrorObject<T>
         where T: notnull
     {
-        public readonly long code;
-        public readonly string message;
-        public readonly T data;
+        public long code { get; set; }
+        public string message { get; set; }
+        public T data { get; set; }
 
         public ErrorObject(ErrorCode code, string message, T data)
         {
@@ -135,12 +246,12 @@ namespace RamType0.JsonRpc
         }
     }
 
-    public readonly struct ErrorResponse : IErrorResponse
+    public struct ErrorResponse : IErrorResponse
     {
-        public readonly JsonRpcVersion jsonrpc;
+        public JsonRpcVersion jsonrpc => default;
         [JsonFormatter(typeof(ID.Formatter.Nullable))]
-        public readonly ID? id;
-        public readonly ErrorObject error;
+        public ID? id { get; set; }
+        public ErrorObject error { get; set; }
 
         public ErrorResponse(ID? id, ErrorObject error) : this()
         {
@@ -175,10 +286,10 @@ namespace RamType0.JsonRpc
         }
 
     }
-    public readonly struct ErrorObject
+    public struct ErrorObject : IErrorObject
     {
-        public readonly long code;
-        public readonly string message;
+        public long code { get; set; }
+        public string message { get; set; }
 
         public ErrorObject(ErrorCode code, string message)
         {

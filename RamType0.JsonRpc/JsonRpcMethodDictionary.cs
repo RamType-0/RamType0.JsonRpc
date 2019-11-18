@@ -26,7 +26,7 @@ namespace RamType0.JsonRpc
             {
                 if (id is ID reqID)
                 {
-                    return Task.Run(() => responser.Response(ErrorResponse.MethodNotFound(reqID, methodName.ToString())));
+                    return Task.Run(() => responser.ResponseError(ErrorResponse.MethodNotFound(reqID, methodName.ToString())));
                 }
                 else
                 {
@@ -41,7 +41,7 @@ namespace RamType0.JsonRpc
             var paramsType = MethodParamsTypeBuilder.CreateParamsType(method, methodName);
             var invoker = Unsafe.As<RpcInvoker>(Activator.CreateInstance(typeof(RpcInvoker<>).MakeGenericType(paramsType)));
             //var invoker = Unsafe.As<RpcInvokerMethod>(typeof(RpcInvoker).GetMethod("ReadParamsAndInvokeAsync")!.MakeGenericMethod(paramsType).CreateDelegate(typeof(RpcInvokerMethod)));
-            RpcMethods.Add(methodName, invoker);
+            RpcMethods.Add(EscapedUTF8String.FromUnEscaped(methodName), invoker);
         }
    
         abstract class RpcInvoker:IDisposable
@@ -69,7 +69,7 @@ namespace RamType0.JsonRpc
             private void DisposeClosuresAndDelegate()
             {
 
-                RpcMethodClosure<TParams>.Dispose();
+                RpcMethodClosure<TParams>.PoolingEnabled = false;
                 default(TParams).Dispose();
             }
 
@@ -114,7 +114,7 @@ namespace RamType0.JsonRpc
                                         if (id is ID reqID)
                                         {
                                             var paramsJson = Encoding.UTF8.GetString(copyReader.ReadNextBlockSegment());//このメソッドが呼ばれた時点でParseErrorはありえない
-                                            return Task.Run(() => responser.Response(ErrorResponse.InvalidParams(reqID, paramsJson)));
+                                            return Task.Run(() => responser.ResponseError(ErrorResponse.InvalidParams(reqID, paramsJson)));
                                         }
                                         else
                                         {
@@ -142,7 +142,7 @@ namespace RamType0.JsonRpc
                                 {
                                     if (id is ID reqID)
                                     {
-                                        return Task.Run(() => responser.Response(ErrorResponse.InvalidParams(reqID, "(not exists)")));
+                                        return Task.Run(() => responser.ResponseError(ErrorResponse.InvalidParams(reqID, "(not exists)")));
                                     }
                                     else
                                     {

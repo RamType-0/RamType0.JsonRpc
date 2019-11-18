@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Buffers;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -11,28 +13,45 @@ namespace RamType0.JsonRpc
     /// methodの名前の解決などに使います。
     /// </summary>
     [JsonFormatter(typeof(Formatter.Persistent))]
-    public readonly struct EscapedUTF8String : IEquatable<EscapedUTF8String>
+    public readonly struct EscapedUTF8String : IEquatable<EscapedUTF8String>,IEnumerable<byte>
     {
-        /// <summary>
-        /// Utf8JsonがReadOnlyMemory対応したらReadOnlyMemoryにしたい
-        /// </summary>
-        readonly ArraySegment<byte> value;
+        readonly ArraySegment<byte> bytes;
         
+        public byte this[int i]
+        {
+            get
+            {
+                return bytes[i];
+            }
+        }
 
         /// <summary>
-        /// 引数で与えたUtf8を書き換えてはいけません。また、ダブルクォーテーションで囲われている必要があります。
+        /// 引数で与えたUtf8を書き換えてはいけません。また、ダブルクォーテーションで囲われていない必要があります。
         /// </summary>
         /// <param name="escapedUtf8"></param>
         private EscapedUTF8String(ArraySegment<byte> escapedUtf8)
         {
-            value = escapedUtf8;
+            bytes = escapedUtf8;
         }
         /// <summary>
-        /// 引数で与えたUtf8を書き換えてはいけません。また、ダブルクォーテーションで囲われている必要があります。
+        /// 引数で与えたUtf8を書き換えてはいけません。
         /// </summary>
         public static EscapedUTF8String FromEscapedQuoted(ArraySegment<byte> text)
         {
+            return new EscapedUTF8String(text.Slice(1,text.Count-2));
+            //return new EscapedUTF8String(text[1..^1]);//C#8のRange使ってみようと思ったけどArraySegment[Range]がコピー作らないかどうかがドキュメントに乗ってないので保留
+
+        }
+        public static EscapedUTF8String FromEscapedNonQuoted(ArraySegment<byte> text)
+        {
             return new EscapedUTF8String(text);
+        }
+
+        public static EscapedUTF8String FromEscapedNonQuoted(ReadOnlySpan<byte> text)
+        {
+            var array = new byte[text.Length];
+            text.CopyTo(array);
+            return FromEscapedNonQuoted(array);
         }
 
         public static EscapedUTF8String FromUnEscaped(string text)
@@ -40,12 +59,15 @@ namespace RamType0.JsonRpc
             var writer = new JsonWriter();
             writer.WriteString(text);
             var buffer = writer.GetBuffer();
-            var array = new byte[buffer.Count];
-            Buffer.BlockCopy(buffer.Array!, buffer.Offset, array, 0, array.Length);
+            var array = new byte[buffer.Count-2];
+            Buffer.BlockCopy(buffer.Array!, buffer.Offset+1, array, 0, array.Length);
             return new EscapedUTF8String(array);
         }
-
-        public int Length => value.Count;
+        
+        /// <summary>
+        /// エスケープした状態の文字列のバイト数を示します。文字列リテラルの両端のダブルクォーテーションは含まれません。
+        /// </summary>
+        public int Length => bytes.Count;
         public override bool Equals(object? obj)
         {
             return obj is EscapedUTF8String @string && Equals(@string);
@@ -53,7 +75,7 @@ namespace RamType0.JsonRpc
 
         public bool Equals([AllowNull] EscapedUTF8String other)
         {
-            return value.AsSpan().SequenceEqual(other.value.AsSpan());
+            return bytes.AsSpan().SequenceEqual(other.bytes.AsSpan());
         }
         /// <summary>
         /// UnEscapeした文字列を返します。
@@ -61,47 +83,70 @@ namespace RamType0.JsonRpc
         /// <returns></returns>
         public override string ToString()
         {
-            return new JsonReader(value.Array, value.Offset).ReadString();
+            ArrayPool<byte> pool = ArrayPool<byte>.Shared;
+            var array = GetQuoted(pool).Array!;
+            var str = new JsonReader(array).ReadString();
+            pool.Return(array);
+            return str;
+        }
+
+        public ArraySegment<byte> GetQuoted(ArrayPool<byte> pool)
+        {
+            int length = QuotedLength;
+            var array = pool.Rent(length);
+            var segment = new ArraySegment<byte>(array, 0, length);
+            GetQuotedCore(segment);
+            return segment;
+        }
+
+        private void GetQuotedCore(ArraySegment<byte> buffer)
+        {
+            buffer[0] = (byte)'\"';
+            Buffer.BlockCopy(bytes.Array!, 0, buffer.Array!, buffer.Offset + 1, bytes.Count);
+            buffer[^1] = (byte)'\"';
+        }
+
+        public int QuotedLength => Length + 2;
+
+        public int GetQuoted(ArraySegment<byte> buffer)
+        {
+            int quotedLength = QuotedLength;
+            if (buffer.Count >= quotedLength)
+            {
+                GetQuotedCore(buffer);
+                return quotedLength;
+            }
+            else
+            {
+                return -1;
+            }
         }
         public override int GetHashCode()
         {
-            var span = value.AsSpan();
-            var length = span.Length;
-            switch (length)
-            {
-                case 0:
-                    return 0;
-
-                case 1:
-                    return span[0].GetHashCode();
-                case 2:
-                    return GetElementUnsafeAs<ushort>(span).GetHashCode();
-                case 3:
-                    return (GetElementUnsafeAs<ushort>(span) | span[2] << 16).GetHashCode();
-                case 4:
-                    return GetElementUnsafeAs<int>(span).GetHashCode();
-                case 5:                
-                case 6:
-                case 7:
-                    return (GetElementUnsafeAs<int>(span) ^ GetElementUnsafeAs<int>(span, length - 4)).GetHashCode();
-                case 8:
-                    return GetElementUnsafeAs<ulong>(span).GetHashCode();
-                default:
-                    return (GetElementUnsafeAs<ulong>(span) ^ GetElementUnsafeAs<ulong>(span, length - 8)).GetHashCode();
-            }
+            return bytes.AsSpan().GetSequenceHashCode();
+            
         }
+
+        
         private EscapedUTF8String Clone()
         {
-            var array = new byte[value.Count];
-            Buffer.BlockCopy(value.Array!, value.Offset, array, 0, array.Length);
+            var array = new byte[bytes.Count];
+            Buffer.BlockCopy(bytes.Array!, bytes.Offset, array, 0, array.Length);
 
-            return FromEscapedQuoted(array);
+            return EscapedUTF8String.FromEscapedNonQuoted(array);
         }
-        private static T GetElementUnsafeAs<T>(ReadOnlySpan<byte> span,int index = 0)
-            where T:unmanaged
+        
+
+        IEnumerator<byte> IEnumerable<byte>.GetEnumerator()
         {
-            return Unsafe.As<byte, T>(ref Unsafe.AsRef(span[index]));
+            return bytes.GetEnumerator();
         }
+
+        public ReadOnlySpan<byte> Span => bytes;
+
+        public ReadOnlySpan<byte>.Enumerator GetEnumerator() => Span.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => bytes.GetEnumerator();
 
         public static bool operator ==(EscapedUTF8String left, EscapedUTF8String right)
         {
@@ -134,13 +179,13 @@ namespace RamType0.JsonRpc
             public static EscapedUTF8String DeserializeUnsafe(ref JsonReader reader)
             {
                 var unQuoted = reader.ReadStringSegmentRaw();
-                var quoted = new ArraySegment<byte>(unQuoted.Array!, unQuoted.Offset - 1, unQuoted.Count + 2);
+                var quoted = new ArraySegment<byte>(unQuoted.Array!, unQuoted.Offset, unQuoted.Count);
                 return new EscapedUTF8String(quoted);
             }
             private static void Serialize(ref JsonWriter writer, EscapedUTF8String value)
             {
                 writer.EnsureCapacity(value.Length);
-                foreach (var c in value.value)
+                foreach (var c in value.bytes)
                 {
                     writer.WriteRawUnsafe(c);
                 }
@@ -235,10 +280,23 @@ namespace RamType0.JsonRpc
             }
         }
         
-        
-        public static implicit operator EscapedUTF8String(string text)
+        //[Obsolete]
+        public static explicit operator EscapedUTF8String(string text)
         {
             return FromUnEscaped(text);
+        }
+    }
+    public static class EscapedUTF8StringJsonWriterEx
+    {
+        public static void WriteString(ref this JsonWriter writer,EscapedUTF8String str)
+        {
+            writer.EnsureCapacity(str.Length+2);
+            writer.WriteRawUnsafe((byte)'\"');
+            foreach (var b in str)
+            {
+                writer.WriteRawUnsafe(b);
+            }
+            writer.WriteRawUnsafe((byte)'\"');
         }
     }
 }
