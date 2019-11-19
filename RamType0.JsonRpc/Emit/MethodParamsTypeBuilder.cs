@@ -2,6 +2,8 @@
 using Utf8Json;
 using System.Reflection.Emit;
 using System.Reflection;
+using System.Threading;
+using System.Linq;
 namespace RamType0.JsonRpc.Emit
 {
 
@@ -32,7 +34,7 @@ namespace RamType0.JsonRpc.Emit
             return paramsObjType;
         }
 
-        private static Type CreateParamsFormatterType(string name, TypeInfo paramsObjType, FieldInfo[] paramsObjFields)
+        private static Type CreateParamsFormatterType(string name, TypeInfo paramsObjType, FieldInfo[] paramsObjFields,int cancellByIDIndex = -1)
         {
             Type baseParamsFormatterType = typeof(ParamsFormatter<>).MakeGenericType(paramsObjType);
             var paramsFormatterType = moduleBuilder.DefineType(name + "ParamsFormatter", TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Class | TypeAttributes.AutoLayout, baseParamsFormatterType);
@@ -46,10 +48,26 @@ namespace RamType0.JsonRpc.Emit
 
             var readFromArrayStyleMethod = paramsFormatterType.DefineMethod("ReadParamsObjectFromArrayStyle", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final, paramsObjType, new[] { typeof(JsonReader).MakeByRefType(), typeof(IJsonFormatterResolver) });
 
+
+            if (cancellByIDIndex != -1)
+            {
+                var array = new FieldInfo[paramsObjFields.Length - 1];
+                for (int i = 0; i < cancellByIDIndex; i++)
+                {
+                    array[i] = paramsObjFields[i];
+                }
+                for (int i = cancellByIDIndex; i < array.Length; i++)
+                {
+                    array[i] = paramsObjFields[i + 1];
+                }
+                paramsObjFields = array;
+            }
+
             var il = readFromArrayStyleMethod.GetILGenerator();
             var paramsObjLocal = il.DeclareLocal(paramsObjType);
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Call, readBeginArrayVerify);
+            
             if (paramsObjFields.Length != 0)
             {
                 for (int i = 0; i < paramsObjFields.Length - 1; i++)
@@ -89,8 +107,8 @@ namespace RamType0.JsonRpc.Emit
             return createdParamsFormatterType;
         }
 
-        static Type[] IParamsObjectTypeArray { get; } = new Type[] { typeof(IMethodParamsObject) };
-        static Type[] IEmptyParamsObjectTypeArray { get; } = new Type[] { typeof(IEmptyParamsObject) };
+        static Type[] IActionParamsObjectTypeArray { get; } = new Type[] { typeof(IActionParamsObject) };
+        static Type[] IEmptyActionParamsObjectTypeArray { get; } = new Type[] {typeof(IActionParamsObject) , typeof(IEmptyParamsObject) };
         private static (TypeInfo paramsType, Type paramsFormatterType) CreateParamsTypes<T>(T jsonRpcFunction, string name, MethodInfo method, ParameterInfo[] parameters) where T : Delegate
         {
 
@@ -100,16 +118,17 @@ namespace RamType0.JsonRpc.Emit
 
             MethodInfo iParamsObjInvokeMethod;
             TypeBuilder type;
+
             {
                 Type[] interfaces;
                 if (returnType == typeof(void))
                 {
-                    interfaces = isEmpty ? IEmptyParamsObjectTypeArray : IParamsObjectTypeArray;
+                    interfaces = isEmpty ? IEmptyActionParamsObjectTypeArray : IActionParamsObjectTypeArray;
                     iParamsObjInvokeMethod = typeof(IMethodParamsObject).GetMethod("Invoke")!;
                 }
                 else
                 {
-                    var genericType = typeof(IMethodParamsObject<>).MakeGenericType(new Type[] { returnType });
+                    var genericType = typeof(IFunctionParamsObject<>).MakeGenericType(new Type[] { returnType });
                     interfaces = isEmpty ? new Type[] { typeof(IEmptyParamsObject), genericType } : new Type[] { typeof(IMethodParamsObject), genericType };
                     iParamsObjInvokeMethod = genericType.GetMethod("Invoke")!;
 
@@ -118,10 +137,10 @@ namespace RamType0.JsonRpc.Emit
                 type = moduleBuilder.DefineType(name + "Params", TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed | TypeAttributes.AutoLayout, typeof(ValueType), interfaces);
 
             }
-            var fields = DefineParamsTypeFields(parameters, isEmpty, type);
+            var fields = DefineParamsTypeFields(parameters, isEmpty, type,out var cancellByIDIndex);
 
             var typeInfo = DefineMethodsAndCreateTypeInfo(jsonRpcFunction, returnType, type, iParamsObjInvokeMethod, fields);
-            var formatterType = CreateParamsFormatterType(name, typeInfo, fields);
+            var formatterType = CreateParamsFormatterType(name, typeInfo, fields,cancellByIDIndex);
             //var jsonFormatterAttrCtor = typeof(JsonFormatterAttribute).GetConstructor(new[] { typeof(Type) })!;
 
             //type.SetCustomAttribute(new CustomAttributeBuilder(jsonFormatterAttrCtor, new[] { formatterType }));
@@ -129,17 +148,53 @@ namespace RamType0.JsonRpc.Emit
         }
 
 
-
-        private static FieldBuilder[] DefineParamsTypeFields(ParameterInfo[] parameters, bool isEmpty, TypeBuilder type)
+        static CustomAttributeBuilder idCancellationTokenAttributeBuilder = new CustomAttributeBuilder(typeof(IDCancellationTokenAttribute).GetConstructor(Type.EmptyTypes)!, Array.Empty<object>());
+        private static FieldBuilder[] DefineParamsTypeFields(ParameterInfo[] parameters, bool isEmpty, TypeBuilder type,out int cancellByIDIndex)
         {
+            cancellByIDIndex = -1;
             var fields = isEmpty ? Array.Empty<FieldBuilder>() : new FieldBuilder[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
             {
                 var parameter = parameters[i];
-                fields[i] = type.DefineField(parameter.Name!, parameter.ParameterType, FieldAttributes.Public);
+                var field = fields[i] = type.DefineField(parameter.Name!, parameter.ParameterType, FieldAttributes.Public);
+                if (parameter.GetCustomAttribute(typeof(CancelledByIDAttribute)) != null)
+                {
+                    if(parameter.ParameterType == typeof(CancellationToken))
+                    {
+                        field.SetCustomAttribute(idCancellationTokenAttributeBuilder);
+                        type.AddInterfaceImplementation(typeof(ICancellableMethodParamsObject));
+                        var property = type.DefineProperty("CancellationToken", PropertyAttributes.HasDefault, typeof(CancellationToken), Type.EmptyTypes);
+                        property.SetGetMethod(DefineCancellationTokenGetter(type, field));
+                        property.SetSetMethod(DefineCancellationTokenSetter(type, field));
+                        cancellByIDIndex = i;
+                    }
+                }
             }
 
             return fields;
+        }
+
+        private static MethodBuilder DefineCancellationTokenGetter(TypeBuilder type,FieldInfo field)
+        {
+            var getter = type.DefineMethod("get_CancellationToken", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.SpecialName | MethodAttributes.HideBySig,typeof(CancellationToken),Type.EmptyTypes);
+            type.DefineMethodOverride(getter, typeof(ICancellableMethodParamsObject).GetMethod("get_CancellationToken")!);
+            var il = getter.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldfld, field);
+            il.Emit(OpCodes.Ret);
+            return getter;
+        }
+
+        private static MethodBuilder DefineCancellationTokenSetter(TypeBuilder type,FieldInfo field)
+        {
+            var setter = type.DefineMethod("set_CancellationToken", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.SpecialName | MethodAttributes.HideBySig,typeof(void),new[] { typeof(CancellationToken)});
+            type.DefineMethodOverride(setter, typeof(ICancellableMethodParamsObject).GetMethod("set_CancellationToken")!);
+            var il = setter.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Stfld, field);
+            il.Emit(OpCodes.Ret);
+            return setter;
         }
 
         private static TypeInfo DefineMethodsAndCreateTypeInfo<T>(T jsonRpcFunction, Type returnType, TypeBuilder type, MethodInfo iParamsObjInvokeMethod, FieldBuilder[] fields) where T : Delegate
@@ -192,28 +247,9 @@ namespace RamType0.JsonRpc.Emit
             disposeIL.Emit(OpCodes.Ret);
         }
     }
-    /// <summary>
-    /// 戻り値を持った関数の引数を表現する<see cref="IMethodParamsObject"/>を示します。
-    /// </summary>
-    /// <typeparam name="T">関数の戻り値の型。</typeparam>
-    public interface IMethodParamsObject<T> : IMethodParamsObject
-    {
-        public new T Invoke();
-        void IMethodParamsObject.Invoke() => Invoke();
-    }
-    /// <summary>
-    /// 関数の引数を表現するオブジェクトを示します。Disposeすると、以後全ての呼び出しがNull参照になります。
-    /// </summary>
-    public interface IMethodParamsObject : IDisposable
-    {
-        public void Invoke();
-        
-    }
 
-    /// <summary>
-    /// インスタンスフィールドを持たない<see cref="IMethodParamsObject"/>を示します。
-    /// </summary>
-    public interface IEmptyParamsObject : IMethodParamsObject { }
+
+   
     public abstract class ParamsFormatter<T>
         where T : struct, IMethodParamsObject
     {
@@ -257,5 +293,9 @@ namespace RamType0.JsonRpc.Emit
         public abstract T ReadParamsObjectFromArrayStyle(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
 
     }
-
+    public interface IArrayStyleParamsDeserializer<T>
+        where T:struct,IMethodParamsObject
+    {
+        T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
+    }
 }

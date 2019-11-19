@@ -1,8 +1,14 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.ObjectPool;
 using RamType0.JsonRpc.Emit;
+using Utf8Json;
 
 namespace RamType0.JsonRpc
 {
@@ -10,9 +16,10 @@ namespace RamType0.JsonRpc
     /// <summary>
     /// ラムダ式使ってFunc作るときに作られるクロージャをカスタム実装してプーリング！
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    abstract class RpcMethodClosure<T>
-            where T : struct, IMethodParamsObject
+    /// <typeparam name="TParams"></typeparam>
+    public sealed class RpcMethodClosure<TParams,TProxy>
+            where TParams : struct, IMethodParamsObject
+        where TProxy:struct,IRpcMethodInvokationProxy<TParams>
     {
         /// <summary>
         /// プーリングを行いつつ新たなクロージャを取得します。プーリング機構が破棄されている場合、プーリングは行われません。
@@ -21,165 +28,303 @@ namespace RamType0.JsonRpc
         /// <param name="parameters"></param>
         /// <param name="id"></param>
         /// <returns></returns>
-        public static RpcMethodClosure<T> GetClosure(IResponser responser, T parameters, ID? id)
+        public static RpcMethodClosure<TParams,TProxy> GetClosure(JsonRpcMethodDictionary methodDictionary,IResponser responser, TParams parameters, ID? id)
         {
-            
-            if(Pool is null || !Pool.TryTake(out var closure))
-            {
-                closure = Factory();
-            }
-            closure.InjectParams(responser, parameters, id);
+
+            var closure = Pool.Get();
+            closure.Inject(methodDictionary,responser, parameters, id);
             return closure;
         }
 
-        private static Func<RpcMethodClosure<T>> Factory { get; } = GetFactory();
 
-        protected RpcMethodClosure(IResponser responser, T parameters, ID? id) : this()
+
+        internal RpcMethodClosure()
         {
-            InjectParams(responser, parameters, id);
+            InvokeAction = InvokeWithPoolingAndLogging;
         }
 
-        static Func<RpcMethodClosure<T>> GetFactory()//TODO:Rpcに限らないクロージャプーリングにしたい・・・IFactoryProviderみたいなのでいけそうだけど仰々しい気もする
+        void Inject(JsonRpcMethodDictionary methodDictionary,IResponser responser, TParams parameters, ID? id)
         {
-            var interfaces = typeof(T).GetInterfaces();
-            foreach (var i in interfaces)
-            {
-                if (i.IsConstructedGenericType && i.GetGenericTypeDefinition() == typeof(IMethodParamsObject<>))
-                {
-                    var factoryMethod = typeof(RpcMethodClosure<,>).MakeGenericType(typeof(T), i.GetGenericArguments()[0]).GetMethod("GetInstance", Type.EmptyTypes)!;
-                    return Unsafe.As<Func<RpcMethodClosure<T>>>(factoryMethod.CreateDelegate(typeof(Func<RpcMethodClosure<T>>)));
-                }
-            }
-            return VoidRpcMethodClosure<T>.GetInstance;
-        }
-
-
-        protected RpcMethodClosure()
-        {
-            InvokeAction = Invoke;
-        }
-
-        public void InjectParams(IResponser responser, T parameters, ID? id)
-        {
+            RpcMethodDictionary = methodDictionary;
             Responser = responser;
             Params = parameters;
             ID = id;
         }
 
-        protected static ConcurrentBag<RpcMethodClosure<T>>? Pool { get; private set; } = new ConcurrentBag<RpcMethodClosure<T>>();
+        //static Stack<RpcMethodClosure<TParams, TProxy>>? Pool => pools?.Value;
+        //static Func<Stack<RpcMethodClosure<TParams, TProxy>>> CreatePool { get; } = () => new Stack<RpcMethodClosure<TParams, TProxy>>();
+        //static ThreadLocal<Stack<RpcMethodClosure<TParams, TProxy>>>? pools  = new ThreadLocal<Stack<RpcMethodClosure<TParams, TProxy>>>(CreatePool);
 
-
-        public static bool PoolingEnabled
+        
+        sealed class PooledPolicy : PooledObjectPolicy<RpcMethodClosure<TParams, TProxy>>
         {
-            get
+            public static PooledPolicy Instance { get; } = new PooledPolicy();
+            public override RpcMethodClosure<TParams, TProxy> Create()
             {
-                return !(Pool is null);
+                return new RpcMethodClosure<TParams, TProxy>();
             }
 
-            set
+            public override bool Return(RpcMethodClosure<TParams, TProxy> obj)
             {
-                if(value)
-                {
-                    if(Pool is null)
-                    {
-                        Pool = new ConcurrentBag<RpcMethodClosure<T>>();
-                    }
-                }
-                else
-                {
-                    Pool = null;
-                }
+                return true;
             }
+
+            
         }
+        static DefaultObjectPool<RpcMethodClosure<TParams, TProxy>> Pool { get; set; } = new DefaultObjectPool<RpcMethodClosure<TParams, TProxy>>(PooledPolicy.Instance);
+
+
         /// <summary>
         /// プーリング機構が破棄されていない場合、プールされている全てのクロージャを開放します。プーリング機構が破棄されていた場合、何も行いません。
         /// このメソッドを呼び出した時点で使用中のクロージャはこのメソッドの呼び出し後に<see cref="Pool"/>に保持されることに注意してください。
         /// </summary>
         public static void ReleasePooledClosures()
         {
-            Pool?.Clear();
+            
+            Pool = new DefaultObjectPool<RpcMethodClosure<TParams, TProxy>>(PooledPolicy.Instance);
+            
+
         }
 
+        public JsonRpcMethodDictionary RpcMethodDictionary { get; private set; } = default!;
+
         public IResponser Responser { get; private set; } = default!;
-        public T Params { get; private set; }
+        public TParams Params { get; private set; }
         public ID? ID { get; private set; }
-        protected abstract void Invoke();//仮想呼び出しをやめたいと思ったがどっちみちDelegate経由するので変わらない
-        public Action InvokeAction { get; }
-    }
-    sealed class VoidRpcMethodClosure<T> : RpcMethodClosure<T>
-        where T : struct, IMethodParamsObject
-    {
-        public static VoidRpcMethodClosure<T> GetInstance()
-        {
-            return new VoidRpcMethodClosure<T>();
-        }
-        protected override void Invoke()
+        public void InvokeWithPoolingAndLogging()
         {
             try
             {
+                InvokeWithLogging(RpcMethodDictionary, Responser, Params, ID);
+            }
+            finally
+            {
+                Pool.Return(this);
+            }
+        }
+
+        public static void InvokeWithLogging(JsonRpcMethodDictionary methodDictionary, IResponser responser, TParams parameters, ID? id)
+        {
+            try
+            {
+                default(TProxy).Invoke(methodDictionary, responser, parameters, id);
+            }
+            catch (Exception e)
+            {
+
+                var errorOutput = Stream.Synchronized(Console.OpenStandardError());//ここあたりのメソッドまともに使ったこと無いのでこれでも危険かもしれない
+                errorOutput.Write(ErrorLogHeader);
+                var unHandledException = JsonSerializer.SerializeUnsafe(e);
+                errorOutput.Write(unHandledException);
+                throw;
+            }
+        }
+
+        static byte[] ErrorLogHeader { get; } = Encoding.UTF8.GetBytes($"Unhandled exception from {typeof(TProxy).Name}. \n");
+
+        public Action InvokeAction { get; }
+
+        
+
+    }
+
+
+    public readonly struct DefaultRpcActionProxy<T> : IRpcActionInvokationProxy<T>
+        where T:struct,IActionParamsObject
+    {
+        public void Invoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, T parameters, ID? id)
+        {
+            try
+            {
+                parameters.Invoke();
+            }
+            catch (Exception e)
+            {
+                if (id is ID requestID)
+                {
+                    responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                }
+                return;
+            }
+            {
+                if (id is ID requestID)
+                {
+                    responser.ResponseResult(ResultResponse.Result(requestID));
+                }
+            }
+        }
+    }
+
+    public readonly struct CancellableRpcActionProxy<T> : IRpcActionInvokationProxy<T>
+        where T : struct, IActionParamsObject,ICancellableMethodParamsObject
+    {
+        public void Invoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, T parameters, ID? id)
+        {
+            try
+            {
+
                 try
                 {
-                    Params.Invoke();
+                    if (id is ID reqID)
+                    {
+                        var cancellationTokenSource = methodDictionary.GetCancellationTokenSource(reqID);
+                        parameters.CancellationToken = cancellationTokenSource.Token;
+
+                    }
+
+                    parameters.Invoke();
                 }
                 catch (Exception e)
                 {
-                    if (ID is ID requestID)
+                    if (id is ID requestID)
                     {
-                        Responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                        if (e is OperationCanceledException)
+                        {
+                            responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));//TODO:キャンセルの別途ハンドリング
+                        }
+                        else
+                        {
+                            responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                        }
                     }
                     return;
                 }
                 {
-                    if (ID is ID requestID)
+                    if (id is ID requestID)
                     {
-                        Responser.ResponseResult(ResultResponse.Result(requestID));
+                        responser.ResponseResult(ResultResponse.Result(requestID));
                     }
                 }
             }
             finally
             {
-                Pool?.Add(this);
+                if (id is ID reqID && methodDictionary.Cancellables.TryRemove(reqID, out var cancellationTokenSource))
+                {
+
+                    methodDictionary.CancellationSourcePool.Return(cancellationTokenSource);
+                }
             }
         }
     }
 
-    sealed class RpcMethodClosure<TParams, TResult> : RpcMethodClosure<TParams>
-        where TParams : struct, IMethodParamsObject<TResult>
+    public readonly struct CancellableRpcFunctionProxy<T,TResult> : IRpcFunctionInvokationProxy<T,TResult>
+        where T : struct, IFunctionParamsObject<TResult>, ICancellableMethodParamsObject
     {
-        public static RpcMethodClosure<TParams, TResult> GetInstance()
+        public void Invoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, T parameters, ID? id)
         {
-            return new RpcMethodClosure<TParams, TResult>();
-        }
-        protected override void Invoke()
-        {
+            
             try
             {
                 TResult result;
+                
                 try
                 {
-                    result = Params.Invoke();
+                    if (id is ID reqID)
+                    {
+                        var cancellationTokenSource = methodDictionary.GetCancellationTokenSource(reqID);
+                        parameters.CancellationToken = cancellationTokenSource.Token;
+
+                    }
+
+                    result = parameters.Invoke();
                 }
                 catch (Exception e)
                 {
-                    if (ID is ID requestID)
+                    if (id is ID requestID)
                     {
-                        Responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                        if (e is OperationCanceledException)
+                        {
+                            responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));//TODO:キャンセルの別途ハンドリング
+                        }
+                        else
+                        {
+                            responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                        }
                     }
                     return;
                 }
                 {
-                    if (ID is ID requestID)
+                    if (id is ID requestID)
                     {
-                        Responser.ResponseResult(new ResultResponse<TResult>(requestID, result));
+                        responser.ResponseResult(ResultResponse.Result(requestID, result));
                     }
                 }
             }
             finally
             {
-                Pool?.Add(this);
+                if (id is ID reqID && methodDictionary.Cancellables.TryRemove(reqID, out var cancellationTokenSource))
+                {
+
+                    methodDictionary.CancellationSourcePool.Return(cancellationTokenSource);
+                }
             }
         }
     }
+
+    public readonly struct DefaultRpcFunctionProxy<TParams, TResult> : IRpcFunctionInvokationProxy<TParams, TResult>
+        where TParams : struct, IFunctionParamsObject<TResult>
+    {
+        public void Invoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, TParams parameters, ID? id)
+        {
+            TResult result;
+            try
+            {
+                result = parameters.Invoke();
+            }
+            catch (Exception e)
+            {
+                if (id is ID requestID)
+                {
+                    responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                }
+                return;
+            }
+            {
+                if (id is ID requestID)
+                {
+                    responser.ResponseResult(new ResultResponse<TResult>(requestID, result));
+                }
+            }
+        }
+    }
+
+    public interface IRpcMethodInvokationProxy<T>
+        where T:struct,IMethodParamsObject
+    {
+        public void Invoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, T parameters, ID? id);
+    }
+
+    public interface IRpcActionInvokationProxy<T> : IRpcMethodInvokationProxy<T>
+        where T : struct, IActionParamsObject
+    {
+        
+    }
+
+    public interface IRpcFunctionInvokationProxy<TParams,TReturn> : IRpcMethodInvokationProxy<TParams>
+        where TParams : struct, IFunctionParamsObject<TReturn>
+    {
+        public new void Invoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, TParams parameters, ID? id);
+        void IRpcMethodInvokationProxy<TParams>.Invoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, TParams parameters, ID? id)
+        {
+            Invoke(methodDictionary,responser,parameters,id);
+        }
+    }
+
+    public static class RpcMethodClosure
+    {
+        public static RpcMethodClosure<T, DefaultRpcActionProxy<T>> GetDefaultActionClosure<T>()
+            where T: struct,IActionParamsObject
+        {
+            return new RpcMethodClosure<T, DefaultRpcActionProxy<T>>();
+        }
+
+        public static RpcMethodClosure<TParams, DefaultRpcFunctionProxy<TParams, TResult>> GetDefaultFunctionClosure<TParams,TResult>()
+            where TParams : struct, IFunctionParamsObject<TResult>
+        {
+            return new RpcMethodClosure<TParams, DefaultRpcFunctionProxy<TParams, TResult>>();
+        }
+    }
+
 
 
 }
