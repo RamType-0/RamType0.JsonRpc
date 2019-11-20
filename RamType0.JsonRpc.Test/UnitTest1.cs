@@ -74,14 +74,6 @@ namespace RamType0.JsonRpc.Test
             var s = JsonSerializer.Deserialize<string[]>("[\"\",\"\"]");
 
         }
-            [Test]
-        public void Utf8JsonTest2()
-        {
-            
-            var s = JsonSerializer.Deserialize<RequestReceiverObject>("{\"jsonrpc\":\"2.0\"}");
-
-        }
-
 
         [Test]
         public void RpcDicTest()
@@ -171,17 +163,15 @@ namespace RamType0.JsonRpc.Test
             dic.Register<Func<string, string>>("log3", (str) => { return str; });
 
             var receiver = CreateReceiver(dic);
-            var tasks = new Task[1000000];
             var bytes = Encoding.UTF8.GetBytes(
                 //"{\"jsonrpc\":\"2.0\"," +
                 "\"params\":[\"1MegaShock!!!\"]," +
                 "\"method\":\"log3\"" +
                 "}");
-            for (int i = 0; i < tasks.Length; i++)
+            for (int i = 0; i < 1000000; i++)
             {
-                tasks[i] = receiver.ResolveAsync(bytes);
+                receiver.ResolveAsync(bytes);
             }
-            Task.WaitAll(tasks);
         }
 
         [Test]
@@ -192,18 +182,17 @@ namespace RamType0.JsonRpc.Test
             dic.Register<Func<string, string>>("log4", (str) => { return str; });
 
             var receiver = CreateReceiver(dic);
-            var tasks = new Task[1000000];
             var bytes = Encoding.UTF8.GetBytes(
                 "{"+
                 //"\"jsonrpc\":\"2.0\"," +
                 "\"params\":[\"1MegaShock!!!\"]," +
                 "\"method\":\"log4\"" +
                 "}");
-            for (int i = 0; i < tasks.Length; i++)
+            for (int i = 0; i < 1000000; i++)
             {
-                tasks[i] = receiver.ResolveAsync(bytes);
+                receiver.ResolveAsync(bytes);
             }
-            Task.WaitAll(tasks);
+
         }
 
         [Test]
@@ -214,18 +203,18 @@ namespace RamType0.JsonRpc.Test
             dic.Register<Func<string, string>>("log5", (str) => { return str; });
 
             var receiver = CreateReceiver(dic);
-            var tasks = new Task[1000000];
+    
             var bytes = Encoding.UTF8.GetBytes(
                 "{" +
                 "\"jsonrpc\":\"1.0\"," +
                 "\"params\":[\"1MegaShock!!!\"]," +
                 "\"method\":\"log5\"" +
                 "}");
-            for (int i = 0; i < tasks.Length; i++)
+            for (int i = 0; i < 1000000; i++)
             {
-                tasks[i] = receiver.ResolveAsync(bytes);
+                receiver.ResolveAsync(bytes);
             }
-            Task.WaitAll(tasks);
+
         }
         [Test]
         public void RpcDic10MLongNotification()

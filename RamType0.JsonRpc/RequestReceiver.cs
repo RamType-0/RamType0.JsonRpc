@@ -36,7 +36,7 @@ namespace RamType0.JsonRpc
         /// </summary>
         /// <param name="segment"></param>
         /// <returns>リクエストの返答までを含む処理の完了を示す<see cref="Task"/>。</returns>
-        Task ResolveAsync(ArraySegment<byte> segment)
+        ValueTask ResolveAsync(ArraySegment<byte> segment)
         {
             return RequestObjectSolver.ResolveRequestAsync(RpcMethodDictionary, Responser, segment, JsonFormatterResolver);
         }
@@ -50,13 +50,13 @@ namespace RamType0.JsonRpc
         /// </summary>
         /// <param name="span"></param>
         /// <returns></returns>
-        public Task ResolveAsync(ReadOnlySpan<byte> span)
+        public ValueTask ResolveAsync(ReadOnlySpan<byte> span)
         {
             var buf = ArrayPool.Rent(span.Length);
             span.CopyTo(buf);
             ArraySegment<byte> json = new ArraySegment<byte>(buf, 0, span.Length);
             var closure = GetClosure(this, json);
-            return Task.Run(closure.InvokeAction);
+            return new ValueTask(Task.Run(closure.InvokeAction));
 
         }
         CopiedResolveClosure GetClosure(RequestReceiver receiver, ArraySegment<byte> json)
@@ -115,7 +115,7 @@ namespace RamType0.JsonRpc
         /// </summary>
         /// <param name="stream"></param>
         /// <returns></returns>
-        public Task ResolveAsync(Stream stream)
+        public ValueTask ResolveAsync(Stream stream)
         {
             if(stream is MemoryStream memoryStream && memoryStream.TryGetBuffer(out var buf2))
             {
@@ -178,7 +178,7 @@ namespace RamType0.JsonRpc
 
             return length;
         }
-        public Task Resolve(string json)
+        public ValueTask Resolve(string json)
         {
             var buffer = ArrayPool.Rent(sizeof(char) *json.Length * 2);//UTF16ではコードポイントは最小2バイト、UTF8では最大4バイトなので最大でも2倍のサイズにおさまる//TODO:UTF16の2バイトコードポイントはUTF8でも3バイト以内である、みたいなことがあるかも？
             var length = Encoding.UTF8.GetBytes(json, buffer);
@@ -190,16 +190,16 @@ namespace RamType0.JsonRpc
 
        
     }
-    public struct RequestReceiverObject
+    struct RequestReceiverObject
     {
-        [JsonFormatter(typeof(JsonRpcVersion.Formatter.Nullable))]
-        public JsonRpcVersion? jsonrpc;
-        [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp.Nullable))]
-        public EscapedUTF8String? method;
+        [JsonFormatter(typeof(JsonRpcVersion.Formatter.Nullable)),DataMember(Name = "jsonrpc")]
+        public JsonRpcVersion? Version { get; set; }
+        [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp.Nullable)),DataMember(Name = "method")]
+        public EscapedUTF8String? Method { get; set; }
         [IgnoreDataMember]
-        public DummyParams @params;
-        [JsonFormatter(typeof(ID.Formatter.Nullable))]
-        public ID? id;
+        public DummyParams Params => default;
+        [JsonFormatter(typeof(ID.Formatter.Nullable)),DataMember(Name ="id")]
+        public ID? ID { get; set; }
     }
 
     public struct DummyParams
@@ -226,7 +226,7 @@ namespace RamType0.JsonRpc
     {
         //internal static InvokingFormatter Instance { get; } = new InvokingFormatter();//=> instance ??= new ResolvingFormatter();
 
-        public static Task ResolveRequestAsync(JsonRpcMethodDictionary methodDictionary, IResponser responser, ArraySegment<byte> json, IJsonFormatterResolver formatterResolver)
+        public static ValueTask ResolveRequestAsync(JsonRpcMethodDictionary methodDictionary, IResponser responser, ArraySegment<byte> json, IJsonFormatterResolver formatterResolver)
         {
             var reader = new JsonReader(json.Array, json.Offset);
             var copyReader = reader;
@@ -249,36 +249,36 @@ namespace RamType0.JsonRpc
                     if (readerOffset >= jsonTerminal)//1個分丸ごとスキップ、さらに空白もスキップした後にまだ終端に達していなかったらおかしい
                     //Jsonの文法はOK=InvalidRequest
                     {
-                        return Task.Run(() => responser.ResponseError(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment))));//TODO:ここもクロージャプーリングする
+                        return new ValueTask(Task.Run(() => responser.ResponseError(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment)))));//TODO:ここもクロージャプーリングする
                     }
                     else
                     {
-                        return Task.Run(() => responser.ResponseException(ErrorResponse.ParseError(ex)));
+                        return new ValueTask( Task.Run(() => responser.ResponseException(ErrorResponse.ParseError(ex))));
                     }
                     
                 }
                 catch (JsonParsingException e)
                 {
                     //正常にこのオブジェクトを読み飛ばせない=Jsonの文法がおかしい=ParseError
-                    return Task.Run(() => responser.ResponseException(ErrorResponse.ParseError(e)));//TODO:ここもクロージャプーリングする
+                    return new ValueTask( Task.Run(() => responser.ResponseException(ErrorResponse.ParseError(e))));//TODO:ここもクロージャプーリングする
                 }
 
             }
 
-            if (request.jsonrpc is JsonRpcVersion)
+            if (request.Version is JsonRpcVersion)
             {
-                if (request.method is EscapedUTF8String MethodName)
+                if (request.Method is EscapedUTF8String MethodName)
                 {
-                    return methodDictionary.InvokeAsync(responser, MethodName, request.id, ref copyReader, formatterResolver);
+                    return methodDictionary.InvokeAsync(responser, MethodName, request.ID, ref copyReader, formatterResolver);
                 }
                 else
                 {
-                    return Task.Run(() => responser.ResponseError(new ErrorResponse(request.id, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing."))));
+                    return new ValueTask( Task.Run(() => responser.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing.")))));
                 }
             }
             else
             {
-                return Task.Run(() => responser.ResponseError(new ErrorResponse(request.id, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing."))));
+                return new ValueTask(Task.Run(() => responser.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing.")))));
             }
 
 
@@ -327,22 +327,22 @@ namespace RamType0.JsonRpc
 
             }
 
-            if (request.jsonrpc is JsonRpcVersion)
+            if (request.Version is JsonRpcVersion)
             {
-                if (request.method is EscapedUTF8String MethodName)
+                if (request.Method is EscapedUTF8String MethodName)
                 {
-                    methodDictionary.Invoke(responser, MethodName, request.id, ref copyReader, formatterResolver);
+                    methodDictionary.Invoke(responser, MethodName, request.ID, ref copyReader, formatterResolver);
                     return;
                 }
                 else
                 {
-                    responser.ResponseError(new ErrorResponse(request.id, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing.")));
+                    responser.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing.")));
                     return;
                 }
             }
             else
             {
-                responser.ResponseError(new ErrorResponse(request.id, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing.")));
+                responser.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing.")));
                 return;
             }
 

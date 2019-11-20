@@ -18,7 +18,7 @@ namespace RamType0.JsonRpc
 
         //delegate Task RpcInvokerMethod(IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver);
        
-        public Task InvokeAsync(IResponser responser,EscapedUTF8String methodName,ID? id,ref JsonReader reader,IJsonFormatterResolver formatterResolver)
+        public ValueTask InvokeAsync(IResponser responser,EscapedUTF8String methodName,ID? id,ref JsonReader reader,IJsonFormatterResolver formatterResolver)
         {
             if(RpcMethods.TryGetValue(methodName,out var invoker))
             {
@@ -28,11 +28,11 @@ namespace RamType0.JsonRpc
             {
                 if (id is ID reqID)
                 {
-                    return Task.Run(() => responser.ResponseError(ErrorResponse.MethodNotFound(reqID, methodName.ToString())));
+                    return new ValueTask(Task.Run(() => responser.ResponseError(ErrorResponse.MethodNotFound(reqID, methodName.ToString()))));
                 }
                 else
                 {
-                    return Task.CompletedTask;
+                    return new ValueTask();
                     
                 }
             }
@@ -106,7 +106,7 @@ namespace RamType0.JsonRpc
         {
             public abstract void ReleasePooledClosures();
             
-            public abstract Task ReadParamsAndInvokeAsync(JsonRpcMethodDictionary methodDictionary,IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver);
+            public abstract ValueTask ReadParamsAndInvokeAsync(JsonRpcMethodDictionary methodDictionary,IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver);
             public abstract void ReadParamsAndInvoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver);
 
 
@@ -188,7 +188,7 @@ namespace RamType0.JsonRpc
             /// <param name="id"></param>
             /// <param name="formatterResolver"></param>
             /// <returns></returns>
-            public override Task ReadParamsAndInvokeAsync(JsonRpcMethodDictionary methodDictionary,IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver)
+            public override ValueTask ReadParamsAndInvokeAsync(JsonRpcMethodDictionary methodDictionary,IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver)
 
             {
                 reader.ReadIsBeginObjectWithVerify();
@@ -217,11 +217,11 @@ namespace RamType0.JsonRpc
                                         if (id is ID reqID)
                                         {
                                             var paramsJson = Encoding.UTF8.GetString(copyReader.ReadNextBlockSegment());//このメソッドが呼ばれた時点でParseErrorはありえない
-                                            return Task.Run(() => responser.ResponseError(ErrorResponse.InvalidParams(reqID, paramsJson)));
+                                            return new ValueTask(Task.Run(() => responser.ResponseError(ErrorResponse.InvalidParams(reqID, paramsJson))));
                                         }
                                         else
                                         {
-                                            return Task.CompletedTask;//TODO:ValueTaskのほうがええんか・・・？
+                                            return new ValueTask();
                                         }
 
                                     }
@@ -245,11 +245,11 @@ namespace RamType0.JsonRpc
                                 {
                                     if (id is ID reqID)
                                     {
-                                        return Task.Run(() => responser.ResponseError(ErrorResponse.InvalidParams(reqID, "(not exists)")));
+                                        return new ValueTask(Task.Run(() => responser.ResponseError(ErrorResponse.InvalidParams(reqID, "(not exists)"))));
                                     }
                                     else
                                     {
-                                        return Task.CompletedTask;
+                                        return new ValueTask();
                                     }
                                 }
                             }
@@ -264,7 +264,7 @@ namespace RamType0.JsonRpc
                 Invoke:
                 //paramsが読み取れた
                 var closure = RpcMethodClosure<TParams,TProxy>.GetClosure(methodDictionary,responser, parameters, id);
-                return Task.Run(closure.InvokeAction);
+                return new ValueTask(Task.Run(closure.InvokeAction));
 
             }
 

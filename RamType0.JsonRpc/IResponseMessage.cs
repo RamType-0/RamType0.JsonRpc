@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.Serialization;
 using System.Text;
 using Utf8Json;
 
@@ -6,37 +7,41 @@ namespace RamType0.JsonRpc
 {
     public interface IResponseMessage : IMessage
     {
-        ID? id { get; set; }
+        [DataMember(Name ="id")]
+        ID? ID { get; set; }
     }
     public interface IErrorResponse : IResponseMessage
     {
-        ErrorObject error { get; set; }
+        [DataMember(Name ="error")]
+        ErrorObject Error { get; set; }
     }
 
     public interface IErrorResponse<T> : IErrorResponse
         where T : notnull
     {
-        new ErrorObject<T> error { get; set; }
-        ErrorObject IErrorResponse.error
+        [DataMember(Name ="error")]
+        new ErrorObject<T> Error { get; set; }
+        ErrorObject IErrorResponse.Error
         {
             get
             {
-                return new ErrorObject(error.code, error.message);
+                return new ErrorObject(Error.Code, Error.Message);
             }
 
             set
             {
-                var newError = error;
-                newError.code = value.code;
-                newError.message = value.message;
-                error = newError;
+                var newError = Error;
+                newError.Code = value.Code;
+                newError.Message = value.Message;
+                Error = newError;
             }
         }
     }
 
     interface IResultResponse<out T> : IResultResponse
     {
-        T result { get; }
+        [DataMember(Name ="result")]
+        T Result { get; }
         //object? IResultResponse.result => result;
     }
 
@@ -47,13 +52,16 @@ namespace RamType0.JsonRpc
 
     interface IErrorObject
     {
-        public long code { get; set; }
-        public string message { get; set; }
+        [DataMember(Name ="code")]
+        public long Code { get; set; }
+        [DataMember(Name ="message")]
+        public string Message { get; set; }
     }
 
     interface IErrorObject<out T> : IErrorObject
     {
-        T data { get; }
+        [DataMember(Name ="data")]
+        T Data { get; }
     }
 
     /// <summary>
@@ -62,15 +70,18 @@ namespace RamType0.JsonRpc
     /// <typeparam name="T"></typeparam>
     public struct ResultResponse<T> : IResultResponse<T>
     {
-        public JsonRpcVersion jsonrpc => default;
-        public T result { get; set; }
+        [DataMember(Name ="jsonrpc")]
+        public JsonRpcVersion Version => default;
+        [DataMember(Name = "result")]
+        public T Result { get; set; }
+        [DataMember(Name = "id")]
         public ID id { get; set; }
 
-        ID? IResponseMessage.id { get => id; set => id = value ?? throw new InvalidOperationException(); }
+        ID? IResponseMessage.ID { get => id; set => id = value ?? throw new InvalidOperationException(); }
 
         internal ResultResponse(ID id, T result) : this()
         {
-            this.result = result;
+            this.Result = result;
             this.id = id;
         }
     }
@@ -79,24 +90,28 @@ namespace RamType0.JsonRpc
     /// </summary>
     public struct ResultResponse : IResultResponse<ResultResponse.VoidMethodResult>
     {
-        public JsonRpcVersion jsonrpc => default;
+        [DataMember(Name = "jsonrpc")]
+        public JsonRpcVersion Version => default;
+
         /// <summary>
         /// nullとしてシリアライズさせるためのダミーです
         /// </summary>
-        public VoidMethodResult result => default;
+        [DataMember(Name = "result")] 
+        public VoidMethodResult Result => default;
+        [DataMember(Name = "id")]
         public ID id { get; set; }
 
-        ID? IResponseMessage.id { get => id; set => id = value ?? throw new InvalidOperationException(); }
+        ID? IResponseMessage.ID { get => id; set => id = value ?? throw new InvalidOperationException(); }
 
         ResultResponse(ID id) : this()
         {
             this.id = id;
         }
-        public static ResultResponse<T> Result<T>(ID id, T result)
+        public static ResultResponse<T> Create<T>(ID id, T result)
         {
             return new ResultResponse<T>(id, result);
         }
-        public static ResultResponse Result(ID id)
+        public static ResultResponse Create(ID id)
         {
             return new ResultResponse(id);
         }
@@ -126,15 +141,18 @@ namespace RamType0.JsonRpc
     public struct ErrorResponse<T> : IErrorResponse<T>
         where T : notnull
     {
-        public JsonRpcVersion jsonrpc => default;
+        [DataMember(Name = "jsonrpc")]
+        public JsonRpcVersion Version => default;
         [JsonFormatter(typeof(ID.Formatter.Nullable))]
-        public ID? id { get; set; }
-        public ErrorObject<T> error { get; set; }
+        [DataMember(Name = "id")]
+        public ID? ID { get; set; }
+        [DataMember(Name ="error")]
+        public ErrorObject<T> Error { get; set; }
 
         internal ErrorResponse(ID? id, ErrorObject<T> error) : this()
         {
-            this.id = id;
-            this.error = error;
+            this.ID = id;
+            this.Error = error;
         }
     }
     public enum ErrorCode : long
@@ -157,15 +175,18 @@ namespace RamType0.JsonRpc
     public struct ErrorObject<T> : IErrorObject<T>
         where T : notnull
     {
-        public long code { get; set; }
-        public string message { get; set; }
-        public T data { get; set; }
+        [DataMember(Name ="code")]
+        public long Code { get; set; }
+        [DataMember(Name ="message")]
+        public string Message { get; set; }
+        [DataMember(Name ="data")]
+        public T Data { get; set; }
 
         public ErrorObject(ErrorCode code, string message, T data)
         {
-            this.code = (long)code;
-            this.message = message;
-            this.data = data;
+            this.Code = (long)code;
+            this.Message = message;
+            this.Data = data;
         }
         public ErrorObject(long errorCode, string message, T data) : this((ErrorCode)errorCode, message, data)
         {
@@ -175,15 +196,17 @@ namespace RamType0.JsonRpc
 
     public struct ErrorResponse : IErrorResponse
     {
-        public JsonRpcVersion jsonrpc => default;
+        public JsonRpcVersion Version => default;
         [JsonFormatter(typeof(ID.Formatter.Nullable))]
-        public ID? id { get; set; }
-        public ErrorObject error { get; set; }
+        [DataMember(Name ="id")]
+        public ID? ID { get; set; }
+        [DataMember(Name ="error")]
+        public ErrorObject Error { get; set; }
 
         public ErrorResponse(ID? id, ErrorObject error) : this()
         {
-            this.id = id;
-            this.error = error;
+            this.ID = id;
+            this.Error = error;
         }
         public static ErrorResponse<Exception> Exception(ID requestID, ErrorCode errorCode, Exception exception)
         {
@@ -215,13 +238,15 @@ namespace RamType0.JsonRpc
     }
     public struct ErrorObject : IErrorObject
     {
-        public long code { get; set; }
-        public string message { get; set; }
+        [DataMember(Name ="code")]
+        public long Code { get; set; }
+        [DataMember(Name ="message")]
+        public string Message { get; set; }
 
         public ErrorObject(ErrorCode code, string message)
         {
-            this.code = (long)code;
-            this.message = message;
+            this.Code = (long)code;
+            this.Message = message;
         }
         public ErrorObject(long errorCode, string message) : this((ErrorCode)errorCode, message)
         {

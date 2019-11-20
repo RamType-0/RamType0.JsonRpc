@@ -148,7 +148,7 @@ namespace RamType0.JsonRpc.Emit
         }
 
 
-        static CustomAttributeBuilder idCancellationTokenAttributeBuilder = new CustomAttributeBuilder(typeof(IDCancellationTokenAttribute).GetConstructor(Type.EmptyTypes)!, Array.Empty<object>());
+        static CustomAttributeBuilder idCancellationTokenAttributeBuilder = new CustomAttributeBuilder(typeof(CancelledByIDAttribute).GetConstructor(Type.EmptyTypes)!, Array.Empty<object>());
         private static FieldBuilder[] DefineParamsTypeFields(ParameterInfo[] parameters, bool isEmpty, TypeBuilder type,out int cancellByIDIndex)
         {
             cancellByIDIndex = -1;

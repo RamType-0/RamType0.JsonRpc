@@ -149,7 +149,7 @@ namespace RamType0.JsonRpc
             {
                 if (id is ID requestID)
                 {
-                    responser.ResponseResult(ResultResponse.Result(requestID));
+                    responser.ResponseResult(ResultResponse.Create(requestID));
                 }
             }
         }
@@ -192,7 +192,7 @@ namespace RamType0.JsonRpc
                 {
                     if (id is ID requestID)
                     {
-                        responser.ResponseResult(ResultResponse.Result(requestID));
+                        responser.ResponseResult(ResultResponse.Create(requestID));
                     }
                 }
             }
@@ -246,7 +246,7 @@ namespace RamType0.JsonRpc
                 {
                     if (id is ID requestID)
                     {
-                        responser.ResponseResult(ResultResponse.Result(requestID, result));
+                        responser.ResponseResult(ResultResponse.Create(requestID, result));
                     }
                 }
             }
