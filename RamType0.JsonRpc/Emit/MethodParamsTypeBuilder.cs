@@ -258,7 +258,7 @@ namespace RamType0.JsonRpc.Emit
         {
             get
             {
-                return instance ?? throw new InvalidOperationException();
+                return instance ?? throw new FormatterNotRegisteredException($"Formatter of { typeof(T).Name} not registered.");
             }
         }
 
@@ -293,9 +293,67 @@ namespace RamType0.JsonRpc.Emit
         public abstract T ReadParamsObjectFromArrayStyle(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
 
     }
-    public interface IArrayStyleParamsDeserializer<T>
-        where T:struct,IMethodParamsObject
+
+    public struct DefaultObjectStyleParamsDeserializationProxy<T> : IObjectStyleParamsDeserializationProxy<T>
+        where T : struct, IMethodParams
+    {
+        public T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+        {
+            return formatterResolver.GetFormatterWithVerify<T>().Deserialize(ref reader, formatterResolver);
+        }
+    }
+
+    public interface IParamsDeserializationProxy<T>
+        where T : struct, IMethodParams
     {
         T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
     }
+
+
+    public readonly struct ParamsDeserializationProxy<T, TObjectStyle, TArrayStyle> : IParamsDeserializationProxy<T>
+        where T : struct, IMethodParams
+        where TObjectStyle : struct, IObjectStyleParamsDeserializationProxy<T>
+        where TArrayStyle : struct, IArrayStyleParamsDeserializationProxy<T>
+    {
+        public T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+        {
+            T paramsObj;
+            switch (reader.GetCurrentJsonToken())
+            {
+                case JsonToken.BeginObject:
+                    {
+                        paramsObj = default(TObjectStyle).Deserialize(ref reader, formatterResolver);
+                        break;
+                    }
+                case JsonToken.BeginArray:
+                    {
+                        paramsObj = default(TArrayStyle).Deserialize(ref reader, formatterResolver);
+                        break;
+                    }
+                default:
+                    {
+                        throw new JsonParsingException("ParamsObject was not array, neither object.");
+                    }
+            }
+            return paramsObj;
+        }
+
+        public static TRead ReadObject<TRead>(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+        {
+            return formatterResolver.GetFormatter<TRead>().Deserialize(ref reader, formatterResolver);
+        }
+
+    }
+
+    public interface IArrayStyleParamsDeserializationProxy<T> : IParamsDeserializationProxy<T>
+        where T:struct,IMethodParams
+    {
+        //T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
+    }
+    public interface IObjectStyleParamsDeserializationProxy<T> : IParamsDeserializationProxy<T>
+        where T : struct, IMethodParams
+    {
+        //T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
+    }
+
 }

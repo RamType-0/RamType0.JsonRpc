@@ -6,10 +6,20 @@ namespace RamType0.JsonRpc
     /// <summary>
     /// 関数の引数を表現するオブジェクトを示します。Disposeすると、以後全ての呼び出しがNull参照になります。
     /// </summary>
-    public interface IMethodParamsObject : IDisposable
+    public interface IMethodParamsObject : IDisposable//TODO:リフレクションで生成された値型がstatic領域に参照を保持するのはファイナライザで対応できない開放漏れの温床になるので邪悪・・・InvokeにDelegate渡して呼び出す方式に変える
     {
         public void Invoke();
-        
+        //public 
+    }
+
+    public interface IMethodParams
+    {
+
+    }
+
+    public interface IEmptyParams : IMethodParams
+    {
+
     }
 
     /// <summary>
