@@ -13,14 +13,6 @@ namespace RamType0.JsonRpc
         static class ParamsBuilder
         {
 
-            public static (Type paramsType, ArraySegment<FieldBuilder> argumentFields, ArraySegment<FieldBuilder> deserializedFields) FromDelegate<T>(T d)
-                where T:Delegate
-            {
-                return FromMethod(d.GetType().GetMethod("Invoke")!);
-                
-                
-            }
-
             public static (Type paramsType, ArraySegment<FieldBuilder> argumentFields,ArraySegment<FieldBuilder> deserializedFields) FromMethod(MethodInfo method)
             {
                 
@@ -41,7 +33,7 @@ namespace RamType0.JsonRpc
 
                     }
                     var _fields = ArrayPool<FieldBuilder>.Shared.Rent(parameters.Length);
-                    var fields = _fields.AsSpan();
+                    var fields = _fields.AsSpan(0,parameters.Length);
                     var cancellByIDIndex = -1;
                     for (int i = 0; i < parameters.Length; i++)
                     {
@@ -52,7 +44,7 @@ namespace RamType0.JsonRpc
                             if (parameter.ParameterType == typeof(CancellationToken))
                             {
                                 field.SetCustomAttribute(idCancellationTokenAttributeBuilder);
-                                builder.AddInterfaceImplementation(typeof(ICancellableMethodParamsObject));
+                                builder.AddInterfaceImplementation(typeof(ICancellableMethodParams));
                                 var property = builder.DefineProperty("CancellationToken", PropertyAttributes.HasDefault, typeof(CancellationToken), Type.EmptyTypes);
                                 property.SetGetMethod(DefineCancellationTokenGetter(builder, field));
                                 property.SetSetMethod(DefineCancellationTokenSetter(builder, field));
@@ -68,7 +60,7 @@ namespace RamType0.JsonRpc
                     {
                         var deserializedFields = new FieldBuilder[parameters.Length - 1];
                         fields[..cancellByIDIndex].CopyTo(deserializedFields);
-                        fields[(cancellByIDIndex + 1)..].CopyTo(deserializedFields.AsSpan()[cancellByIDIndex..]);
+                        fields[(cancellByIDIndex + 1)..].CopyTo(deserializedFields.AsSpan(cancellByIDIndex));
 
                         return (type, argFields, deserializedFields);
                     }

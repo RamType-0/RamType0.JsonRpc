@@ -1,16 +1,9 @@
 ﻿using System;
 using System.Threading;
+using Utf8Json;
 
 namespace RamType0.JsonRpc
 {
-    /// <summary>
-    /// 関数の引数を表現するオブジェクトを示します。Disposeすると、以後全ての呼び出しがNull参照になります。
-    /// </summary>
-    public interface IMethodParamsObject : IDisposable//TODO:リフレクションで生成された値型がstatic領域に参照を保持するのはファイナライザで対応できない開放漏れの温床になるので邪悪・・・InvokeにDelegate渡して呼び出す方式に変える
-    {
-        public void Invoke();
-        //public 
-    }
 
     public interface IMethodParams
     {
@@ -27,29 +20,64 @@ namespace RamType0.JsonRpc
     {
         public CancellationToken CancellationToken { get; set; }
     }
-    /// <summary>
-    /// 戻り値を持った関数の引数を表現する<see cref="IMethodParamsObject"/>を示します。
-    /// </summary>
-    /// <typeparam name="T">関数の戻り値の型。</typeparam>
-    public interface IFunctionParamsObject<T> : IMethodParamsObject
+
+    public struct DefaultObjectStyleParamsDeserializer<T> : IObjectStyleParamsDeserializer<T>
+            where T : struct, IMethodParams
     {
-        public new T Invoke();
-        void IMethodParamsObject.Invoke() => Invoke();
+        public T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+        {
+            return formatterResolver.GetFormatterWithVerify<T>().Deserialize(ref reader, formatterResolver);
+        }
     }
 
-    public interface ICancellableMethodParamsObject : IMethodParamsObject
+    public interface IParamsDeserializer<T>
+        where T : struct, IMethodParams
     {
-        public CancellationToken CancellationToken { get; set; }
+        T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
     }
 
-    public interface IActionParamsObject : IMethodParamsObject
+
+    public readonly struct ParamsDeserializer<T, TObjectStyle, TArrayStyle> : IParamsDeserializer<T>
+        where T : struct, IMethodParams
+        where TObjectStyle : struct, IObjectStyleParamsDeserializer<T>
+        where TArrayStyle : struct, IArrayStyleParamsDeserializer<T>
     {
+        public T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+        {
+            T paramsObj;
+            switch (reader.GetCurrentJsonToken())
+            {
+                case JsonToken.BeginObject:
+                    {
+                        paramsObj = default(TObjectStyle).Deserialize(ref reader, formatterResolver);
+                        break;
+                    }
+                case JsonToken.BeginArray:
+                    {
+                        paramsObj = default(TArrayStyle).Deserialize(ref reader, formatterResolver);
+                        break;
+                    }
+                default:
+                    {
+                        throw new JsonParsingException("ParamsObject was not array, neither object.");
+                    }
+            }
+            return paramsObj;
+        }
+
+
 
     }
 
-    /// <summary>
-    /// インスタンスフィールドを持たない<see cref="IMethodParamsObject"/>を示します。
-    /// </summary>
-    public interface IEmptyParamsObject : IMethodParamsObject { }
+    public interface IArrayStyleParamsDeserializer<T> : IParamsDeserializer<T>
+        where T : struct, IMethodParams
+    {
 
+
+    }
+    public interface IObjectStyleParamsDeserializer<T> : IParamsDeserializer<T>
+        where T : struct, IMethodParams
+    {
+
+    }
 }

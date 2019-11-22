@@ -1,7 +1,6 @@
 using NUnit.Framework;
 using RamType0.JsonRpc;
 using System;
-using static RamType0.JsonRpc.Emit.MethodParamsTypeBuilder;
 using Utf8Json;
 using Utf8Json.Resolvers;
 using System.Diagnostics;
@@ -20,54 +19,7 @@ namespace RamType0.JsonRpc.Test
             
         }
 
-        [Test]
-        public void Test1()
-        {
-            var paramsType = MethodParamsTypeBuilder.CreateParamsType<Func<object,object,bool>>(ReferenceEquals,"t1");
-            using (dynamic paramsObj = Activator.CreateInstance(paramsType))
-            {
-                paramsObj.objA = paramsObj.objB = null;
-                Assert.AreEqual(true, paramsObj.Invoke());
-            }
-        }
 
-        [Test]
-        public void Test2()
-        {
-            var paramsType = MethodParamsTypeBuilder.CreateParamsType<Func<int,int>>(1.CompareTo,"t2");
-            using (var paramsObj = (IFunctionParamsObject<int>)Activator.CreateInstance(paramsType))
-            {
-                ((dynamic)paramsObj).value = 2;
-                Assert.AreEqual(-1, paramsObj.Invoke());
-                Assert.IsFalse(paramsObj is IEmptyParamsObject);
-            }
-        }
-
-        [Test]
-        public void Test3()
-        {
-            var paramsType = MethodParamsTypeBuilder.CreateParamsType<Func<string>>("".ToString,"");
-            IFunctionParamsObject<string> paramsObj = (IFunctionParamsObject<string>)Activator.CreateInstance(paramsType);
-            Assert.AreEqual("", paramsObj.Invoke());
-            Assert.IsTrue(paramsObj is IEmptyParamsObject);
-            paramsObj.Dispose();
-            Assert.Throws<NullReferenceException>(()=>paramsObj.Invoke());
-            
-            
-        }
-        [Test]
-        public void Test4()
-        {
-            var paramsType = MethodParamsTypeBuilder.CreateParamsType<Func<int, int>>(1.CompareTo,"t4");
-            var paramsObj = (IFunctionParamsObject<int>)Activator.CreateInstance(paramsType);
-
-            ((dynamic)paramsObj).value = 0;
-            paramsObj.Dispose();
-            Assert.Throws<NullReferenceException>(() => paramsObj.Invoke());
-            Assert.IsFalse(paramsObj is IEmptyParamsObject);
-
-
-        }
         [Test]
         public void Utf8JsonTest1()
         {
@@ -151,7 +103,6 @@ namespace RamType0.JsonRpc.Test
             }
             //Task.WaitAll(tasks);
         }
-
 
         
 
@@ -263,6 +214,68 @@ namespace RamType0.JsonRpc.Test
             }
             //Task.WaitAll(tasks);
 
+        }
+        public void RpcDic1MSingleThreadNotification()
+        {
+            var dic = new JsonRpcMethodDictionary();
+
+            dic.Register<Func<string, string>>("sT", (str) => { return str; });
+
+            var receiver = CreateReceiver(dic);
+            //var tasks = new Task[10000000];
+            var bytes = Encoding.UTF8.GetBytes(
+                "{\"jsonrpc\":\"2.0\"," +
+                "\"params\":[\"10MegaShock!!!\"]," +
+                "\"method\":\"sT\"" +
+                "}");
+            for (int i = 0; i < 1_000_000; i++)
+            {
+                receiver.Resolve(bytes);
+            }
+            //Task.WaitAll(tasks);
+        }
+        [Test]
+
+        public void RpcDic1MSingleThreadUnmanagedParams()
+        {
+            var dic = new JsonRpcMethodDictionary();
+
+            dic.Register<Func<long,long>>("mul2", (number) => { return number * 2; });
+
+            var receiver = CreateReceiver(dic);
+            //var tasks = new Task[10000000];
+            var bytes = Encoding.UTF8.GetBytes(
+                "{\"jsonrpc\":\"2.0\"," +
+                "\"params\":{\"number\":231}," +
+                "\"method\":\"mul2\"" +
+                "}");
+            for (int i = 0; i < 1_000_000; i++)
+            {
+                receiver.Resolve(bytes);
+            }
+            //Task.WaitAll(tasks);
+        }
+
+        [Test]
+
+        public void RpcDic10MUnmanagedParams()
+        {
+            var dic = new JsonRpcMethodDictionary();
+
+            dic.Register<Func<long, long>>("mul3", (number) => { return number * 3; });
+
+            var receiver = CreateReceiver(dic);
+            //var tasks = new Task[10000000];
+            var bytes = Encoding.UTF8.GetBytes(
+                "{\"jsonrpc\":\"2.0\"," +
+                "\"params\":{\"number\":231}," +
+                "\"method\":\"mul3\"" +
+                "}");
+            for (int i = 0; i < 10_000_000; i++)
+            {
+                receiver.ResolveAsync(bytes);
+            }
+            //Task.WaitAll(tasks);
         }
 
     }

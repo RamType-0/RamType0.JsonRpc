@@ -41,7 +41,7 @@ namespace RamType0.JsonRpc
             return RequestObjectSolver.ResolveRequestAsync(RpcMethodDictionary, Responser, segment, JsonFormatterResolver);
         }
 
-        void Resolve(ArraySegment<byte> segment)
+        public void Resolve(ArraySegment<byte> segment)
         {
             RequestObjectSolver.ResolveRequest(RpcMethodDictionary, Responser, segment, JsonFormatterResolver);
         }
@@ -59,6 +59,9 @@ namespace RamType0.JsonRpc
             return new ValueTask(Task.Run(closure.InvokeAction));
 
         }
+
+        
+
         CopiedResolveClosure GetClosure(RequestReceiver receiver, ArraySegment<byte> json)
         {
             CopiedResolveClosure closure = Pool.Get();
@@ -190,36 +193,24 @@ namespace RamType0.JsonRpc
 
        
     }
-    struct RequestReceiverObject
+    public struct RequestReceiverObject
     {
-        [JsonFormatter(typeof(JsonRpcVersion.Formatter.Nullable)),DataMember(Name = "jsonrpc")]
+        [JsonFormatter(typeof(JsonRpcVersion.Formatter.Nullable))]
+        [DataMember(Name = "jsonrpc")]
         public JsonRpcVersion? Version { get; set; }
-        [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp.Nullable)),DataMember(Name = "method")]
+        [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp.Nullable))]
+        [DataMember(Name = "method")]
         public EscapedUTF8String? Method { get; set; }
         [IgnoreDataMember]
         public DummyParams Params => default;
-        [JsonFormatter(typeof(ID.Formatter.Nullable)),DataMember(Name ="id")]
+        [JsonFormatter(typeof(ID.Formatter.Nullable))]
+        [DataMember(Name = "id")]
         public ID? ID { get; set; }
     }
 
     public struct DummyParams
     {
-        /*
-        class Formatter : IJsonFormatter<DummyParams>
-        {
-            public Formatter Instance { get; } = new Formatter();
-            public DummyParams Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
-            {
-                reader.ReadNextBlock();
-                return default;
-            }
 
-            public void Serialize(ref JsonWriter writer, DummyParams value, IJsonFormatterResolver formatterResolver)
-            {
-                throw new NotSupportedException();
-            }
-        }
-        */
     }
 
     internal static class RequestObjectSolver// : IJsonFormatter<RequestReceiverObject>
@@ -265,7 +256,7 @@ namespace RamType0.JsonRpc
 
             }
 
-            if (request.Version is JsonRpcVersion)
+            if (request.Version.HasValue)// is JsonRpcVersionだとボックス化が入る罠
             {
                 if (request.Method is EscapedUTF8String MethodName)
                 {
@@ -326,8 +317,8 @@ namespace RamType0.JsonRpc
                 }
 
             }
-
-            if (request.Version is JsonRpcVersion)
+            
+            if (request.Version.HasValue)// is JsonRpcVersionだとボックス化が入る罠
             {
                 if (request.Method is EscapedUTF8String MethodName)
                 {

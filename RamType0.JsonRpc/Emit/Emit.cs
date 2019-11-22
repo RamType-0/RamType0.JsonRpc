@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
+using static RamType0.JsonRpc.JsonRpcMethodDictionary;
 
 namespace RamType0.JsonRpc
 {
@@ -23,48 +24,49 @@ namespace RamType0.JsonRpc
         [ThreadStatic]
         static Type[]? typeArray4;
         static Type[] TypeArray4 => typeArray4 ??= new Type[4];
-        [ThreadStatic]
-        static object[]? objArray1;
-        static object[] ObjArray1 => objArray1 ??= new object[1];
 
         #endregion
-        internal static JsonRpcMethodDictionary.RpcInvoker FromDelegate<T>(T d)
+        internal static RpcEntry FromDelegate<T>(T d)
             where T:Delegate
         {
             MethodInfo method = d.Method;
             var returnType = method.ReturnType;
             bool isVoidMethod = returnType == typeof(void);
-            bool isFuncOrAction = isVoidMethod ? IsAction<T>() : IsFunc<T>();
+            bool isFuncOrAction = isVoidMethod ? IsAction<T>() : IsFunc<T>();//FuncまたはActionでないときは、デリゲート自体の引数の名前、属性を元にRpcEntryを生成します。
             var sourceMethod = isFuncOrAction ? method : typeof(T).GetMethod("Invoke")!;
-            var generated = GeneratedRpcInvokers;
+            var generated = GeneratedFactories;
             lock (generated) {
-                if(generated.TryGetValue(sourceMethod,out var invoker))
+                if(generated.TryGetValue(sourceMethod,out var factory))
                 {
-                    return invoker;
+                    return factory.CreateNew(d);
                 }
                 var (paramsType, args, deserializedFields) = ParamsBuilder.FromMethod(sourceMethod);
                 ReadOnlySpan<FieldInfo> fields = new ReadOnlySpan<FieldInfo>(deserializedFields.Array!, deserializedFields.Offset, deserializedFields.Count);
                 var arrayDeserializerType = ParamsDeserializerBuilder.ArrayStyle.Create(paramsType, fields);
                 var typeArray3 = TypeArray3;
-                typeArray3[0] = paramsType;
                 {
+                    typeArray3[0] = paramsType;
+                
                     var genericArgs = TypeArray1;
                     genericArgs[0] = paramsType;
 
                     typeArray3[1] = typeof(DefaultObjectStyleParamsDeserializer<>).MakeGenericType(genericArgs);
+
+                    typeArray3[2] = arrayDeserializerType;
                 }
-                typeArray3[2] = arrayDeserializerType;
                 var deserializerType = typeof(ParamsDeserializer<,,>).MakeGenericType(typeArray3);
                 ReadOnlySpan<FieldInfo> arguments = new ReadOnlySpan<FieldInfo>(args.Array!, args.Offset, args.Count);
                 var invokerType = RpcDelegateInvokerBuilder.Create<T>(paramsType, arguments);
                 Type responseCreaterType;
+                bool isCancellable = typeof(ICancellableMethodParams).IsAssignableFrom(paramsType);
                 if (isVoidMethod)
                 {
 
                     typeArray3[0] = typeof(T);
                     typeArray3[1] = paramsType;
                     typeArray3[2] = invokerType;
-                    responseCreaterType = typeof(DefaultActionProxy<,,>).MakeGenericType(typeArray3);
+                    var genericType = isCancellable ? typeof(DefaultCancellableActionProxy<,,>):typeof(DefaultActionProxy<,,>);
+                    responseCreaterType = genericType.MakeGenericType(typeArray3);
                 }
                 else
                 {
@@ -73,22 +75,23 @@ namespace RamType0.JsonRpc
                     funcProxyGenericArgs[1] = paramsType;
                     funcProxyGenericArgs[2] = returnType;
                     funcProxyGenericArgs[3] = invokerType;
-                    responseCreaterType = typeof(DefaultFunctionProxy<,,,>).MakeGenericType(funcProxyGenericArgs);
+                    var genericType = isCancellable? typeof(DefaultCancellableFunctionProxy<,,,>) : typeof(DefaultFunctionProxy<,,,>);
+                    responseCreaterType = genericType.MakeGenericType(funcProxyGenericArgs);
                 }
-                var rpcInvokerArgs = TypeArray4;
-                rpcInvokerArgs[0] = responseCreaterType;
-                rpcInvokerArgs[1] = typeof(T);
-                rpcInvokerArgs[2] = paramsType;
-                rpcInvokerArgs[3] = deserializerType;
-                var ctorArgs = ObjArray1;
-                ctorArgs[0] = d;
-                var rpcInvoker = Unsafe.As<JsonRpcMethodDictionary.RpcInvoker>(Activator.CreateInstance(typeof(JsonRpcMethodDictionary.RpcInvoker<,,,>).MakeGenericType(rpcInvokerArgs), BindingFlags.NonPublic, null, ctorArgs, null));
-                generated.Add(sourceMethod, rpcInvoker);
-                return rpcInvoker; 
+                var entryFactoryArgs = TypeArray4;
+                entryFactoryArgs[0] = responseCreaterType;
+                entryFactoryArgs[1] = typeof(T);
+                entryFactoryArgs[2] = paramsType;
+                entryFactoryArgs[3] = deserializerType;
+                {
+                    var newFactory = Unsafe.As<RpcEntryFactory>(Activator.CreateInstance(typeof(RpcEntryFactory<,,,>).MakeGenericType(entryFactoryArgs)));
+                    generated.Add(sourceMethod, newFactory);
+                    return newFactory.CreateNew(d);
+                }
             }
         }
 
-        static Dictionary<MethodInfo, JsonRpcMethodDictionary.RpcInvoker> GeneratedRpcInvokers { get; } = new Dictionary<MethodInfo, JsonRpcMethodDictionary.RpcInvoker>();
+        static Dictionary<MethodInfo, RpcEntryFactory> GeneratedFactories { get; } = new Dictionary<MethodInfo, RpcEntryFactory>();
 
         public static bool IsAction<T>()
             where T : Delegate
@@ -135,6 +138,29 @@ namespace RamType0.JsonRpc
                 return true;
             }
             return false;
+        }
+
+        internal abstract class RpcEntryFactory
+        {
+            public abstract RpcEntry CreateNew(Delegate rpcMethod);
+        }
+        internal sealed class RpcEntryFactory<TProxy, TDelegate, TParams, TDeserializer> : RpcEntryFactory
+            where TProxy : struct, RpcResponseCreater<TDelegate, TParams>
+            where TDelegate : Delegate
+            where TParams : struct, IMethodParams
+            where TDeserializer : struct, IParamsDeserializer<TParams>
+        {
+            public override RpcEntry CreateNew(Delegate rpcMethod)
+            {
+                try
+                {
+                    return new RpcEntry<TProxy, TDelegate, TParams, TDeserializer>(Unsafe.As<TDelegate>(rpcMethod));
+                }
+                catch (InvalidCastException)
+                {
+                    throw new ArgumentException();
+                }
+            }
         }
     }
 }
