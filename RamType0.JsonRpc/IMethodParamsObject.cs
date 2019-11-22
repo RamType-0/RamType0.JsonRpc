@@ -22,6 +22,11 @@ namespace RamType0.JsonRpc
 
     }
 
+
+    public interface ICancellableMethodParams : IMethodParams
+    {
+        public CancellationToken CancellationToken { get; set; }
+    }
     /// <summary>
     /// 戻り値を持った関数の引数を表現する<see cref="IMethodParamsObject"/>を示します。
     /// </summary>

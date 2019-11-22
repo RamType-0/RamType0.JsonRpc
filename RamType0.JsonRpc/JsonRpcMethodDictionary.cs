@@ -6,10 +6,11 @@ using System.Reflection.Emit;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Threading;
-using RamType0.JsonRpc.Emit;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.ObjectPool;
 using System.Collections.Concurrent;
+using static RamType0.JsonRpc.Emit;
+
 namespace RamType0.JsonRpc
 {
     public class JsonRpcMethodDictionary
@@ -102,7 +103,7 @@ namespace RamType0.JsonRpc
         }
 
         internal ConcurrentDictionary<ID, CancellationTokenSource> Cancellables { get; } = new ConcurrentDictionary<ID, CancellationTokenSource>();
-        abstract class RpcInvoker:IDisposable
+        internal abstract class RpcInvoker:IDisposable
         {
             public abstract void ReleasePooledClosures();
             
@@ -352,11 +353,11 @@ namespace RamType0.JsonRpc
 
         }
 
-        sealed class RpcInvoker<TProxy,TDelegate,TParams,TDeserializer> : RpcInvoker
+        internal sealed class RpcInvoker<TProxy,TDelegate,TParams,TDeserializer> : RpcInvoker
             where TProxy:struct,RpcResponseCreater<TDelegate,TParams>
             where TDelegate : Delegate
             where TParams : struct,IMethodParams
-            where TDeserializer :struct,IParamsDeserializationProxy<TParams>
+            where TDeserializer :struct,IParamsDeserializer<TParams>
         {
             public RpcInvoker(TDelegate rpcMethod)
             {
@@ -543,24 +544,24 @@ namespace RamType0.JsonRpc
         /// </summary>
         /// <typeparam name="TDelegate">呼び出し対象の<see langword="delegate"/>の具象型。</typeparam>
         /// <typeparam name="TParams"><typeparamref name="TDelegate"/>の引数へ変換される型。</typeparam>
-        public interface RpcDelegateInvoker<TDelegate,in TParams>
+        public interface IRpcDelegateInvoker<TDelegate,in TParams>
             where TDelegate :Delegate
             where TParams: IMethodParams
         {
             void Invoke(TDelegate invokedDelegate, TParams parameters);
         }
-        public interface IRpcActionInvoker<TDelegate, in TParams> : RpcDelegateInvoker<TDelegate,TParams>
+        public interface IRpcActionInvoker<TDelegate, in TParams> : IRpcDelegateInvoker<TDelegate,TParams>
             where TDelegate : Delegate
             where TParams : IMethodParams
         {
 
         }
-        public interface IRpcFunctionInvoker<TDelegate, in TParams,out TResult> : RpcDelegateInvoker<TDelegate,TParams>
+        public interface IRpcFunctionInvoker<TDelegate, in TParams,out TResult> : IRpcDelegateInvoker<TDelegate,TParams>
             where TDelegate : Delegate
             where TParams : IMethodParams
         {
             new TResult Invoke(TDelegate invokedDelegate, TParams parameters);
-            void RpcDelegateInvoker<TDelegate, TParams>.Invoke(TDelegate invokedDelegate, TParams parameters) => Invoke(invokedDelegate, parameters);
+            void IRpcDelegateInvoker<TDelegate, TParams>.Invoke(TDelegate invokedDelegate, TParams parameters) => Invoke(invokedDelegate, parameters);
         }
 
 

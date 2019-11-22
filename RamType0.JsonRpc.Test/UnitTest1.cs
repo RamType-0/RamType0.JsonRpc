@@ -1,7 +1,6 @@
 using NUnit.Framework;
 using RamType0.JsonRpc;
 using System;
-using RamType0.JsonRpc.Emit;
 using static RamType0.JsonRpc.Emit.MethodParamsTypeBuilder;
 using Utf8Json;
 using Utf8Json.Resolvers;
@@ -9,6 +8,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Text;
 using System.Threading;
+using static RamType0.JsonRpc.Emit;
 
 namespace RamType0.JsonRpc.Test
 {

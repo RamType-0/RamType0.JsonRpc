@@ -7,7 +7,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.ObjectPool;
-using RamType0.JsonRpc.Emit;
 using Utf8Json;
 
 namespace RamType0.JsonRpc
@@ -239,7 +238,7 @@ namespace RamType0.JsonRpc
         #endregion
     }
 
-    public readonly struct DefaultFunctionProxy<TInvoker, TDelegate, TParams,TResult> : JsonRpcMethodDictionary.RpcResponseCreater<TDelegate,TParams>
+    public readonly struct DefaultFunctionProxy<TDelegate, TParams,TResult, TInvoker> : JsonRpcMethodDictionary.RpcResponseCreater<TDelegate,TParams>
         where TInvoker:struct, JsonRpcMethodDictionary.IRpcFunctionInvoker<TDelegate,TParams,TResult>
                     where TDelegate : Delegate
             where TParams : IMethodParams
@@ -268,7 +267,7 @@ namespace RamType0.JsonRpc
         }
 
     }
-    public readonly struct DefaultActionProxy<TInvoker, TDelegate, TParams> : JsonRpcMethodDictionary.RpcResponseCreater<TDelegate, TParams>
+    public readonly struct DefaultActionProxy<TDelegate, TParams, TInvoker> : JsonRpcMethodDictionary.RpcResponseCreater<TDelegate, TParams>
         where TInvoker : struct, JsonRpcMethodDictionary.IRpcActionInvoker<TDelegate, TParams>
                     where TDelegate : Delegate
             where TParams : IMethodParams
