@@ -2,32 +2,27 @@
 using System.Collections.Generic;
 using System.Text;
 using Utf8Json;
-using System.Reflection.Emit;
-using System.Reflection;
 using System.Threading.Tasks;
 using System.Threading;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.ObjectPool;
 using System.Collections.Concurrent;
-using static RamType0.JsonRpc.Emit;
 
 namespace RamType0.JsonRpc
 {
     public class JsonRpcMethodDictionary
     {
         Dictionary<EscapedUTF8String, RpcEntry> RpcMethods { get; } = new Dictionary<EscapedUTF8String, RpcEntry>();
-
-        public ValueTask InvokeAsync(IResponser responser,EscapedUTF8String methodName,ID? id,ref JsonReader reader,IJsonFormatterResolver formatterResolver)
+        public ValueTask InvokeAsync(IResponseOutput output,EscapedUTF8String methodName,ID? id,ref JsonReader reader,IJsonFormatterResolver formatterResolver)
         {
             if(RpcMethods.TryGetValue(methodName,out var invoker))
             {
-                return invoker.ReadParamsAndInvokeAsync(this,responser, ref reader, id, formatterResolver);
+                return invoker.ReadParamsAndInvokeAsync(this,output, id, ref reader, formatterResolver);
             }
             else
             {
                 if (id is ID reqID)
                 {
-                    return new ValueTask(Task.Run(() => responser.ResponseError(ErrorResponse.MethodNotFound(reqID, methodName.ToString()))));
+                    return new ValueTask(Task.Run(() => output.ResponseError(ErrorResponse.MethodNotFound(reqID, methodName.ToString()))));
                 }
                 else
                 {
@@ -36,19 +31,18 @@ namespace RamType0.JsonRpc
                 }
             }
         }
-
-        public void Invoke(IResponser responser, EscapedUTF8String methodName, ID? id, ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+        public void Invoke(IResponseOutput output, EscapedUTF8String methodName, ID? id, ref JsonReader reader, IJsonFormatterResolver formatterResolver)
         {
             if (RpcMethods.TryGetValue(methodName, out var invoker))
             {
-                invoker.ReadParamsAndInvoke(this, responser, ref reader, id, formatterResolver);
+                invoker.ReadParamsAndInvoke(this, output, id, ref reader, formatterResolver);
                 return;
             }
             else
             {
                 if (id is ID reqID)
                 {
-                    responser.ResponseError(ErrorResponse.MethodNotFound(reqID, methodName.ToString()));
+                    output.ResponseError(ErrorResponse.MethodNotFound(reqID, methodName.ToString()));
                 }
                 else
                 {
@@ -56,27 +50,24 @@ namespace RamType0.JsonRpc
                 }
             }
         }
-
-        public void Register<T>(string methodName,T method)
-            where T:Delegate
+        public void Register(string methodName,RpcEntry entry)
         {
-            var invoker = Emit.FromDelegate(method);
-            //var invoker = Unsafe.As<RpcInvokerMethod>(typeof(RpcInvoker).GetMethod("ReadParamsAndInvokeAsync")!.MakeGenericMethod(paramsType).CreateDelegate(typeof(RpcInvokerMethod)));
-            RpcMethods.Add(EscapedUTF8String.FromUnEscaped(methodName), invoker);
+            var rpcMethods = RpcMethods;
+            lock (rpcMethods)
+            {
+                rpcMethods.Add(EscapedUTF8String.FromUnEscaped(methodName), entry);
+            }
         }
-
         internal CancellationTokenSource GetCancellationTokenSource(ID id)
         {
             var source = CancellationSourcePool.Get();
             if(!Cancellables.TryAdd(id, source))
             {
-                throw new InvalidOperationException("ID conflicted!");
+                throw new ArgumentException("ID conflicted!");//InvalidOperationExceptionにしてたけど同名の型作ったときはArgumentExceptionだったので・・・
             }
             return source;
         }
-
         internal DefaultObjectPool<CancellationTokenSource> CancellationSourcePool { get; } = new DefaultObjectPool<CancellationTokenSource>(CancellationSourcePooledPolicy.Instance);
-
         sealed class CancellationSourcePooledPolicy : PooledObjectPolicy<CancellationTokenSource>
         {
             public static CancellationSourcePooledPolicy Instance { get; } = new CancellationSourcePooledPolicy();
@@ -98,250 +89,220 @@ namespace RamType0.JsonRpc
                 }
             }
         }
-
         internal ConcurrentDictionary<ID, CancellationTokenSource> Cancellables { get; } = new ConcurrentDictionary<ID, CancellationTokenSource>();
-        internal abstract class RpcEntry:IDisposable
+        
+ 
+    }
+    public abstract class RpcEntry : IDisposable
+    {
+        public static RpcEntry FromDelegate<T>(T d)
+            where T : Delegate
         {
-            public abstract void ReleasePooledClosures();
-            
-            public abstract ValueTask ReadParamsAndInvokeAsync(JsonRpcMethodDictionary methodDictionary,IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver);
-            public abstract void ReadParamsAndInvoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver);
-            public abstract void Dispose();
-
-
+            return Emit.FromDelegate(d).NewEntry(d);
         }
-
-
-        internal sealed class RpcEntry<TProxy,TDelegate,TParams,TDeserializer> : RpcEntry
-            where TProxy:struct,RpcResponseCreater<TDelegate,TParams>
-            where TDelegate : Delegate
-            where TParams : struct,IMethodParams
-            where TDeserializer :struct,IParamsDeserializer<TParams>
+        public abstract void ReleasePooledClosures();
+        public abstract ValueTask ReadParamsAndInvokeAsync(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, ID? id, ref JsonReader reader, IJsonFormatterResolver formatterResolver);
+        public abstract void ReadParamsAndInvoke(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, ID? id, ref JsonReader reader, IJsonFormatterResolver formatterResolver);
+        public abstract void Dispose();
+    }
+    public sealed class RpcEntry<TProxy, TDelegate, TParams, TDeserializer> : RpcEntry
+        where TProxy : notnull, IRpcMethodProxy<TDelegate, TParams>
+        where TDelegate : Delegate
+        where TParams : struct, IMethodParams
+        where TDeserializer : notnull, IParamsDeserializer<TParams>
+    {
+        public RpcEntry(TProxy proxy, TDelegate rpcMethod, TDeserializer paramsDeserializer)
         {
-            internal RpcEntry(TDelegate rpcMethod)
+            Proxy = proxy;
+            RpcMethod = rpcMethod;
+            ParamsDeserializer = paramsDeserializer;
+        }
+        public TProxy Proxy { get; private set; }
+        public TDelegate RpcMethod { get; private set; }
+        public TDeserializer ParamsDeserializer { get; private set; }
+
+        public override void ReadParamsAndInvoke(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, ID? id, ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+        {
+            reader.ReadIsBeginObjectWithVerify();
+            ReadOnlySpan<byte> paramsStr = stackalloc byte[] { (byte)'p', (byte)'a', (byte)'r', (byte)'a', (byte)'m', (byte)'s', };
+            TParams parameters;
+            while (true)
             {
-                this.rpcMethod = rpcMethod;
-            }
-            public TDelegate rpcMethod;
 
-
-
-            public override void ReadParamsAndInvoke(JsonRpcMethodDictionary methodDictionary, IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver)
-            {
-                reader.ReadIsBeginObjectWithVerify();
-                ReadOnlySpan<byte> paramsStr = stackalloc byte[] { (byte)'p', (byte)'a', (byte)'r', (byte)'a', (byte)'m', (byte)'s', };
-                TParams parameters;
-                while (true)
+                JsonToken token = reader.GetCurrentJsonToken();
+                switch (token)
                 {
-
-                    JsonToken token = reader.GetCurrentJsonToken();
-                    switch (token)
-                    {
-                        case JsonToken.String:
-                            //IsProperty
+                    case JsonToken.String:
+                        //IsProperty
+                        {
+                            //IsParams
+                            if (reader.ReadPropertyNameSegmentRaw().AsSpan().SequenceEqual(paramsStr))
                             {
-                                //IsParams
-                                if (reader.ReadPropertyNameSegmentRaw().AsSpan().SequenceEqual(paramsStr))
-                                {
 
-                                    var copyReader = reader;
-                                    try
-                                    {
-                                        parameters = default(TDeserializer).Deserialize(ref reader, formatterResolver);
-                                    }
-                                    catch (JsonParsingException)
-                                    {
-                                        if (id is ID reqID)
-                                        {
-                                            var paramsJson = Encoding.UTF8.GetString(copyReader.ReadNextBlockSegment());//このメソッドが呼ばれた時点でParseErrorはありえない
-                                            responser.ResponseError(ErrorResponse.InvalidParams(reqID, paramsJson));
-                                            return;
-                                        }
-                                        else
-                                        {
-                                            return;
-                                        }
-
-                                    }
-                                    goto Invoke;
-                                }
-                                else
+                                var copyReader = reader;
+                                try
                                 {
-                                    reader.ReadNextBlock();
-                                    reader.ReadIsValueSeparatorWithVerify();
-                                    continue;
+                                    parameters = ParamsDeserializer.Deserialize(ref reader, formatterResolver);
                                 }
-                            }
-                        case JsonToken.EndObject:
-                            {
-                                if (default(TParams) is IEmptyParams)
-                                {
-                                    parameters = default;
-                                    goto Invoke;
-                                }
-                                else
+                                catch (JsonParsingException)
                                 {
                                     if (id is ID reqID)
                                     {
-                                        responser.ResponseError(ErrorResponse.InvalidParams(reqID, "(not exists)"));
+                                        var paramsJson = Encoding.UTF8.GetString(copyReader.ReadNextBlockSegment());//このメソッドが呼ばれた時点でParseErrorはありえない
+                                        output.ResponseError(ErrorResponse.InvalidParams(reqID, paramsJson));
                                         return;
                                     }
                                     else
                                     {
                                         return;
                                     }
+
+                                }
+                                goto Invoke;
+                            }
+                            else
+                            {
+                                reader.ReadNextBlock();
+                                if (!reader.ReadIsValueSeparator())
+                                {
+                                    reader.ReadIsEndObjectWithVerify();
+                                    goto case JsonToken.EndObject;
+                                }
+                                continue;
+                            }
+                        }
+                    case JsonToken.EndObject:
+                        {
+                            if (default(TParams) is IEmptyParams)
+                            {
+                                parameters = default;
+                                goto Invoke;
+                            }
+                            else
+                            {
+                                if (id is ID reqID)
+                                {
+                                    output.ResponseError(ErrorResponse.InvalidParams(reqID, "(not exists)"));
+                                    return;
+                                }
+                                else
+                                {
+                                    return;
                                 }
                             }
+                        }
 
-                        default:
-                            {
-                                throw new JsonParsingException($"Expected property or end of object,but {((char)reader.GetBufferUnsafe()[reader.GetCurrentOffsetUnsafe()]).ToString()}");
-                            }
-                    }
-
+                    default:
+                        {
+                            throw new JsonParsingException($"Expected property or end of object,but {((char)reader.GetBufferUnsafe()[reader.GetCurrentOffsetUnsafe()]).ToString()}");
+                        }
                 }
-            Invoke:
-                //paramsが読み取れた
-                RpcMethodClosure<TProxy,TDelegate,TParams>.InvokeWithLogging(methodDictionary, responser,rpcMethod, parameters, id);
-                return;
-            }
 
-            public override void ReleasePooledClosures()
-            {
-                RpcMethodClosure<TProxy, TDelegate, TParams>.ReleasePooledClosures();
             }
-            ~RpcEntry()
+        Invoke:
+            //paramsが読み取れた
+            RpcMethodClosure<TProxy, TDelegate, TParams>.InvokeWithLogging(methodDictionary, output, Proxy, RpcMethod, parameters, id);
+            return;
+        }
+
+        public override void ReleasePooledClosures()
+        {
+            RpcMethodClosure<TProxy, TDelegate, TParams>.ReleasePooledClosures();
+        }
+        ~RpcEntry()
+        {
+            DisposeCore();
+        }
+        public override ValueTask ReadParamsAndInvokeAsync(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, ID? id, ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+        {
+            reader.ReadIsBeginObjectWithVerify();
+            ReadOnlySpan<byte> paramsStr = stackalloc byte[] { (byte)'p', (byte)'a', (byte)'r', (byte)'a', (byte)'m', (byte)'s', };
+            TParams parameters;
+            while (true)
             {
-                ReleasePooledClosures();
-            }
-            public override ValueTask ReadParamsAndInvokeAsync(JsonRpcMethodDictionary methodDictionary, IResponser responser, ref JsonReader reader, ID? id, IJsonFormatterResolver formatterResolver)
-            {
-                reader.ReadIsBeginObjectWithVerify();
-                ReadOnlySpan<byte> paramsStr = stackalloc byte[] { (byte)'p', (byte)'a', (byte)'r', (byte)'a', (byte)'m', (byte)'s', };
-                TParams parameters;
-                while (true)
+
+                JsonToken token = reader.GetCurrentJsonToken();
+                switch (token)
                 {
-
-                    JsonToken token = reader.GetCurrentJsonToken();
-                    switch (token)
-                    {
-                        case JsonToken.String:
-                            //IsProperty
+                    case JsonToken.String:
+                        //IsProperty
+                        {
+                            //IsParams
+                            if (reader.ReadPropertyNameSegmentRaw().AsSpan().SequenceEqual(paramsStr))
                             {
-                                //IsParams
-                                if (reader.ReadPropertyNameSegmentRaw().AsSpan().SequenceEqual(paramsStr))
-                                {
 
-                                    var copyReader = reader;
-                                    try
-                                    {
-                                        parameters = default(TDeserializer).Deserialize(ref reader, formatterResolver);
-                                    }
-                                    catch (JsonParsingException)
-                                    {
-                                        if (id is ID reqID)
-                                        {
-                                            var paramsJson = Encoding.UTF8.GetString(copyReader.ReadNextBlockSegment());//このメソッドが呼ばれた時点でParseErrorはありえない
-                                            return new ValueTask(Task.Run(() => responser.ResponseError(ErrorResponse.InvalidParams(reqID, paramsJson))));
-                                        }
-                                        else
-                                        {
-                                            return new ValueTask();
-                                        }
-
-                                    }
-                                    goto Invoke;
-                                }
-                                else
+                                var copyReader = reader;
+                                try
                                 {
-                                    reader.ReadNextBlock();
-                                    reader.ReadIsValueSeparatorWithVerify();
-                                    continue;
+                                    parameters = ParamsDeserializer.Deserialize(ref reader, formatterResolver);
                                 }
-                            }
-                        case JsonToken.EndObject:
-                            {
-                                if (default(TParams) is IEmptyParams)
-                                {
-                                    parameters = default;
-                                    goto Invoke;
-                                }
-                                else
+                                catch (JsonParsingException)
                                 {
                                     if (id is ID reqID)
                                     {
-                                        return new ValueTask(Task.Run(() => responser.ResponseError(ErrorResponse.InvalidParams(reqID, "(not exists)"))));
+                                        var paramsJson = Encoding.UTF8.GetString(copyReader.ReadNextBlockSegment());//このメソッドが呼ばれた時点でParseErrorはありえない
+                                        return new ValueTask(Task.Run(() => output.ResponseError(ErrorResponse.InvalidParams(reqID, paramsJson))));
                                     }
                                     else
                                     {
                                         return new ValueTask();
                                     }
+
+                                }
+                                goto Invoke;
+                            }
+                            else
+                            {
+                                reader.ReadNextBlock();
+                                reader.ReadIsValueSeparatorWithVerify();
+                                continue;
+                            }
+                        }
+                    case JsonToken.EndObject:
+                        {
+                            if (default(TParams) is IEmptyParams)
+                            {
+                                parameters = default;
+                                goto Invoke;
+                            }
+                            else
+                            {
+                                if (id is ID reqID)
+                                {
+                                    return new ValueTask(Task.Run(() => output.ResponseError(ErrorResponse.InvalidParams(reqID, "(not exists)"))));
+                                }
+                                else
+                                {
+                                    return new ValueTask();
                                 }
                             }
+                        }
 
-                        default:
-                            {
-                                throw new JsonParsingException($"Expected property or end of object,but {((char)reader.GetBufferUnsafe()[reader.GetCurrentOffsetUnsafe()]).ToString()}");
-                            }
-                    }
-
+                    default:
+                        {
+                            throw new JsonParsingException($"Expected property or end of object,but {((char)reader.GetBufferUnsafe()[reader.GetCurrentOffsetUnsafe()]).ToString()}");
+                        }
                 }
-            Invoke:
-                //paramsが読み取れた
-                var closure = RpcMethodClosure<TProxy, TDelegate, TParams>.GetClosure(methodDictionary, responser,rpcMethod, parameters, id);
-                return new ValueTask(Task.Run(closure.InvokeAction));
 
             }
-
-            public override void Dispose()
-            {
-                ReleasePooledClosures();
-                GC.SuppressFinalize(this);
-            }
-
+        Invoke:
+            //paramsが読み取れた
+            var closure = RpcMethodClosure<TProxy, TDelegate, TParams>.GetClosure(methodDictionary, output, Proxy, RpcMethod, parameters, id);
+            return new ValueTask(Task.Run(closure.InvokeAction));
 
         }
-
-
-        /// <summary>
-        /// <typeparamref name="TParams"/>を<typeparamref name="TDelegate"/>の引数に変換し、呼び出しを行います。
-        /// </summary>
-        /// <typeparam name="TDelegate">呼び出し対象の<see langword="delegate"/>の具象型。</typeparam>
-        /// <typeparam name="TParams"><typeparamref name="TDelegate"/>の引数へ変換される型。</typeparam>
-        public interface IRpcDelegateInvoker<TDelegate,in TParams>
-            where TDelegate :Delegate
-            where TParams: IMethodParams
+        public override void Dispose()
         {
-            void Invoke(TDelegate invokedDelegate, TParams parameters);
-        }
-        public interface IRpcActionInvoker<TDelegate, in TParams> : IRpcDelegateInvoker<TDelegate,TParams>
-            where TDelegate : Delegate
-            where TParams : IMethodParams
-        {
-
-        }
-        public interface IRpcFunctionInvoker<TDelegate, in TParams,out TResult> : IRpcDelegateInvoker<TDelegate,TParams>
-            where TDelegate : Delegate
-            where TParams : IMethodParams
-        {
-            new TResult Invoke(TDelegate invokedDelegate, TParams parameters);
-            void IRpcDelegateInvoker<TDelegate, TParams>.Invoke(TDelegate invokedDelegate, TParams parameters) => Invoke(invokedDelegate, parameters);
+            DisposeCore();
+            GC.SuppressFinalize(this);
         }
 
-
-        public interface RpcResponseCreater<TDelegate, in TParams>
-            where TDelegate:Delegate
-            where TParams:IMethodParams
+        private void DisposeCore()
         {
-            /// <summary>
-            /// <paramref name="rpcMethod"/>に<paramref name="parameters"/>を引数に変換して呼び出し、<paramref name="id"/>が<see langword="null"/>でなければ呼び出し結果に基づいたレスポンスを生成、それを<paramref name="responser"/>に伝えるまでを全て代行します。
-            /// </summary>
-            /// <param name="methodDictionary">呼び出し元の<see cref="JsonRpcMethodDictionary"/>。</param>
-            /// <param name="responser">レスポンスの最終的な処理を行う<see cref="IResponser"/>。</param>
-            /// <param name="rpcMethod"></param>
-            /// <param name="parameters"></param>
-            /// <param name="id"></param>
-            void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponser responser,TDelegate rpcMethod , TParams parameters, ID? id = null);
+            ReleasePooledClosures();
+            Proxy = default!;
+            RpcMethod = default!;
+            ParamsDeserializer = default!;
         }
     }
 

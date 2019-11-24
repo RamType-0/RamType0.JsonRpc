@@ -6,11 +6,11 @@ using Utf8Json;
 namespace RamType0.JsonRpc
 {
     /// <summary>
-    /// スレッドセーフ、標準的な<see cref="IResponser"/>の実装です。
+    /// スレッドセーフ、標準的な<see cref="IResponseOutput"/>の実装です。
     /// </summary>
-    public class DefaultResponser : IResponser
+    public class DefaultResponseOutput : IResponseOutput
     {
-        public DefaultResponser(Stream output)
+        public DefaultResponseOutput(Stream output)
         {
             Output = Stream.Synchronized(output);
         }
@@ -24,7 +24,7 @@ namespace RamType0.JsonRpc
             
         }
 
-        void IResponser.Response<T>(T response)
+        void IResponseOutput.Response<T>(T response)
         {
             Response(response);
         }
@@ -33,7 +33,7 @@ namespace RamType0.JsonRpc
     /// <summary>
     /// 最終的な<see cref="IResponseMessage"/>の出力を行うクラスを示します。
     /// </summary>
-    public interface IResponser
+    public interface IResponseOutput
     {
         protected void Response<T>(T response) where T :notnull, IResponseMessage;
         public void ResponseResult<TResult>(ResultResponse<TResult> response)

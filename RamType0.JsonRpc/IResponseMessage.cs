@@ -75,14 +75,14 @@ namespace RamType0.JsonRpc
         [DataMember(Name = "result")]
         public T Result { get; set; }
         [DataMember(Name = "id")]
-        public ID id { get; set; }
+        public ID ID { get; set; }
 
-        ID? IResponseMessage.ID { get => id; set => id = value ?? throw new InvalidOperationException(); }
+        ID? IResponseMessage.ID { get => ID; set => ID = value ?? throw new InvalidOperationException(); }
 
         internal ResultResponse(ID id, T result) : this()
         {
             this.Result = result;
-            this.id = id;
+            this.ID = id;
         }
     }
     /// <summary>
@@ -99,13 +99,13 @@ namespace RamType0.JsonRpc
         [DataMember(Name = "result")] 
         public VoidMethodResult Result => default;
         [DataMember(Name = "id")]
-        public ID id { get; set; }
+        public ID ID { get; set; }
 
-        ID? IResponseMessage.ID { get => id; set => id = value ?? throw new InvalidOperationException(); }
+        ID? IResponseMessage.ID { get => ID; set => ID = value ?? throw new InvalidOperationException(); }
 
         ResultResponse(ID id) : this()
         {
-            this.id = id;
+            this.ID = id;
         }
         public static ResultResponse<T> Create<T>(ID id, T result)
         {
@@ -227,7 +227,7 @@ namespace RamType0.JsonRpc
         }
         public static ErrorResponse InvalidParams(ID requestID, string paramsJson)
         {
-            return new ErrorResponse(null, new ErrorObject(ErrorCode.InvalidParams, $"The params of request object was invalid. Assigned params:{paramsJson}"));
+            return new ErrorResponse(requestID, new ErrorObject(ErrorCode.InvalidParams, $"The params of request object was invalid. Assigned params:{paramsJson}"));
         }
 
         public static ErrorResponse InvalidRequest(string requestJson)

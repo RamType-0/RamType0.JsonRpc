@@ -16,14 +16,6 @@ namespace RamType0.JsonRpc
     public readonly struct EscapedUTF8String : IEquatable<EscapedUTF8String>,IEnumerable<byte>
     {
         readonly ArraySegment<byte> bytes;
-        
-        public byte this[int i]
-        {
-            get
-            {
-                return bytes[i];
-            }
-        }
 
         /// <summary>
         /// 引数で与えたUtf8を書き換えてはいけません。また、ダブルクォーテーションで囲われていない必要があります。

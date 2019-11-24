@@ -39,10 +39,15 @@ namespace RamType0.JsonRpc
                     {
                         ParameterInfo parameter = parameters[i];
                         var field = fields[i] = builder.DefineField(parameter.Name!, parameter.ParameterType, FieldAttributes.Public);
-                        if (parameter.GetCustomAttribute(typeof(CancelledByIDAttribute)) != null)
+                        if (parameter.GetCustomAttribute(typeof(IDCancellationAttribute)) != null)
                         {
                             if (parameter.ParameterType == typeof(CancellationToken))
                             {
+
+                                if (parameters.Length == 1)
+                                {
+                                    builder.AddInterfaceImplementation(typeof(IEmptyParams));
+                                }
                                 field.SetCustomAttribute(idCancellationTokenAttributeBuilder);
                                 builder.AddInterfaceImplementation(typeof(ICancellableMethodParams));
                                 var property = builder.DefineProperty("CancellationToken", PropertyAttributes.HasDefault, typeof(CancellationToken), Type.EmptyTypes);
@@ -73,7 +78,7 @@ namespace RamType0.JsonRpc
                 
 
             
-            readonly static CustomAttributeBuilder idCancellationTokenAttributeBuilder = new CustomAttributeBuilder(typeof(CancelledByIDAttribute).GetConstructor(Type.EmptyTypes)!, Array.Empty<object>());
+            readonly static CustomAttributeBuilder idCancellationTokenAttributeBuilder = new CustomAttributeBuilder(typeof(IDCancellationAttribute).GetConstructor(Type.EmptyTypes)!, Array.Empty<object>());
             private static MethodBuilder DefineCancellationTokenGetter(TypeBuilder type, FieldInfo field)
             {
                 var getter = type.DefineMethod("get_CancellationToken", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(CancellationToken), Type.EmptyTypes);

@@ -23,7 +23,7 @@ namespace RamType0.JsonRpc.Test
         [Test]
         public void Utf8JsonTest1()
         {
-            var s = JsonSerializer.Deserialize<string[]>("[\"\",\"\"]");
+            JsonSerializer.Deserialize<string[]>("[\"\",\"\"]");
 
         }
 
@@ -32,8 +32,8 @@ namespace RamType0.JsonRpc.Test
         {
 
             var dic = new JsonRpcMethodDictionary();
-            dic.Register<Action<string>>("log", (str) => Debug.WriteLine(str));
-            dic.Register<Action>("none", () => { });
+            dic.Register("log", RpcEntry.FromDelegate<Action<string>>((str) => Debug.WriteLine(str)));
+            dic.Register("none", RpcEntry.FromDelegate<Action>( () => { }));
             RequestReceiver receiver = CreateReceiver(dic);
             receiver.Resolve(
                 "{\"jsonrpc\":\"2.0\"," +
@@ -55,7 +55,7 @@ namespace RamType0.JsonRpc.Test
 
         {
             
-            var responser = new DefaultResponser(Console.OpenStandardOutput());
+            var responser = new DefaultResponseOutput(Console.OpenStandardOutput());
             var receiver = new RequestReceiver(dic, responser, JsonSerializer.DefaultResolver);
             return receiver;
         }
@@ -65,7 +65,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<string,string>>("log1", (str) => { return str; });
+            dic.Register("log1",RpcEntry.FromDelegate<Func<string,string>>((str) => { return str; }));
             //var tasks = new Task[10000000];
             var receiver = CreateReceiver(dic);
             var bytes = Encoding.UTF8.GetBytes(
@@ -88,8 +88,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<string, string>>("log2", (str) => {  return str; });
-
+            dic.Register("log2",RpcEntry.FromDelegate<Func<string, string>>((str) => {  return str; }));
             var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
@@ -111,7 +110,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<string, string>>("log3", (str) => { return str; });
+            dic.Register("log3",RpcEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
 
             var receiver = CreateReceiver(dic);
             var bytes = Encoding.UTF8.GetBytes(
@@ -130,7 +129,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<string, string>>("log4", (str) => { return str; });
+            dic.Register("log4", RpcEntry.FromDelegate<Func<string, string>>( (str) => { return str; }));
 
             var receiver = CreateReceiver(dic);
             var bytes = Encoding.UTF8.GetBytes(
@@ -151,7 +150,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<string, string>>("log5", (str) => { return str; });
+            dic.Register("log5", RpcEntry.FromDelegate<Func<string, string>>( (str) => { return str; }));
 
             var receiver = CreateReceiver(dic);
     
@@ -172,7 +171,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<string, string>>("log6", (str) => { return str; });
+            dic.Register("log6", RpcEntry.FromDelegate<Func<string, string>>( (str) => { return str; }));
 
             var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];
@@ -188,17 +187,17 @@ namespace RamType0.JsonRpc.Test
             //Task.WaitAll(tasks);
         }
 
-        public string CancellableFunc(string ret, [CancelledByID] CancellationToken token)
+        public void CancellableFunc(CancellationToken token)
         {
-            return ret;
+            return;
         }
-
+        public delegate void TestCancellable([IDCancellation]CancellationToken token);
         [Test]
         public void RpcDic10MCancellableReq()
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<string,CancellationToken, string>>("cancellable",CancellableFunc );
+            dic.Register("cancellable", RpcEntry.FromDelegate<TestCancellable>(CancellableFunc));
             //var tasks = new Task[10000000];
             var receiver = CreateReceiver(dic);
             
@@ -206,7 +205,7 @@ namespace RamType0.JsonRpc.Test
             {
                 var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
-                "\"params\":[\"10MegaShock!!!\"]," +
+                //"\"params\":[\"10MegaShock!!!\"]," +
                 "\"method\":\"cancellable\"," +
                 $"\"id\":{i.ToString()}" +
                 "}");
@@ -219,7 +218,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<string, string>>("sT", (str) => { return str; });
+            dic.Register("sT", RpcEntry.FromDelegate<Func<string, string>>( (str) => { return str; }));
 
             var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];
@@ -240,7 +239,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<long,long>>("mul2", (number) => { return number * 2; });
+            dic.Register("mul2", RpcEntry.FromDelegate<Func<long,long>>( (number) => { return number * 2; }));
 
             var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];
@@ -262,7 +261,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = new JsonRpcMethodDictionary();
 
-            dic.Register<Func<long, long>>("mul3", (number) => { return number * 3; });
+            dic.Register("mul3", RpcEntry.FromDelegate<Func<long, long>>((number) => { return number * 3; }));
 
             var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];

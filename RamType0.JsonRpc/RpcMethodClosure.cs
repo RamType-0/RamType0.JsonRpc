@@ -11,24 +11,24 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc
 {
-
-
     public sealed class RpcMethodClosure<TProxy, TDelegate, TParams>
-         where TProxy : struct, JsonRpcMethodDictionary.RpcResponseCreater<TDelegate, TParams>
+         where TProxy : notnull,IRpcMethodProxy<TDelegate, TParams>
             where TDelegate : Delegate
             where TParams : struct, IMethodParams
     {
         public JsonRpcMethodDictionary RpcMethodDictionary { get; private set; } = default!;
 
-        public IResponser Responser { get; private set; } = default!;
+        public IResponseOutput Output { get; private set; } = default!;
+        public TProxy Proxy { get; private set; } = default!;
         public TDelegate RpcMethod { get; private set; } = default!;
         public TParams Params { get; private set; }
         public ID? ID { get; private set; }
+        public Action InvokeAction { get; }
         public void InvokeWithPoolingAndLogging()
         {
             try
             {
-                InvokeWithLogging(RpcMethodDictionary, Responser,RpcMethod, Params, ID);
+                InvokeWithLogging(RpcMethodDictionary, Output,Proxy,RpcMethod, Params, ID);
             }
             finally
             {
@@ -36,12 +36,11 @@ namespace RamType0.JsonRpc
             }
         }
 
-        public static void InvokeWithLogging(JsonRpcMethodDictionary methodDictionary, IResponser responser,TDelegate rpcMethod, TParams parameters, ID? id)
+        public static void InvokeWithLogging(JsonRpcMethodDictionary methodDictionary, IResponseOutput output,TProxy proxy, TDelegate rpcMethod, TParams parameters, ID? id)
         {
             try
             {
-               
-                default(TProxy).DelegateResponse(methodDictionary, responser,rpcMethod ,parameters, id);
+                proxy.DelegateResponse(methodDictionary, output,rpcMethod ,parameters, id);
             }
             catch (Exception e)
             {
@@ -55,7 +54,7 @@ namespace RamType0.JsonRpc
         }
 
         static byte[] ErrorLogHeader { get; } = Encoding.UTF8.GetBytes($"Unhandled exception from {typeof(TProxy).Name}. \n");
-        internal RpcMethodClosure()
+        private RpcMethodClosure()
         {
             InvokeAction = InvokeWithPoolingAndLogging;
         }
@@ -63,15 +62,14 @@ namespace RamType0.JsonRpc
         /// <summary>
         /// プーリングを行いつつ新たなクロージャを取得します。プーリング機構が破棄されている場合、プーリングは行われません。
         /// </summary>
-        /// <param name="responser"></param>
+        /// <param name="output"></param>
         /// <param name="parameters"></param>
         /// <param name="id"></param>
         /// <returns></returns>
-        public static RpcMethodClosure<TProxy, TDelegate, TParams> GetClosure(JsonRpcMethodDictionary methodDictionary, IResponser responser,TDelegate rpcMethod, TParams parameters, ID? id)
+        public static RpcMethodClosure<TProxy, TDelegate, TParams> GetClosure(JsonRpcMethodDictionary methodDictionary, IResponseOutput output,TProxy proxy,TDelegate rpcMethod, TParams parameters, ID? id)
         {
-
             var closure = Pool.Get();
-            closure.Inject(methodDictionary, responser,rpcMethod, parameters, id);
+            closure.Inject(methodDictionary, output,proxy,rpcMethod, parameters, id);
             return closure;
         }
 
@@ -79,18 +77,17 @@ namespace RamType0.JsonRpc
 
         
 
-        void Inject(JsonRpcMethodDictionary methodDictionary, IResponser responser,TDelegate rpcMethod ,TParams parameters, ID? id)
+        void Inject(JsonRpcMethodDictionary methodDictionary, IResponseOutput output,TProxy proxy,TDelegate rpcMethod ,TParams parameters, ID? id)
         {
             RpcMethodDictionary = methodDictionary;
-            Responser = responser;
+            Output = output;
+            Proxy = proxy;
             RpcMethod = rpcMethod;
             Params = parameters;
             ID = id;
         }
 
 
-
-        public Action InvokeAction { get; }
         public static void ReleasePooledClosures()
         {
 
@@ -110,7 +107,8 @@ namespace RamType0.JsonRpc
             public override bool Return(RpcMethodClosure<TProxy, TDelegate, TParams> obj)
             {
                 obj.RpcMethodDictionary = null!;
-                obj.Responser = null!;
+                obj.Output = null!;
+                obj.Proxy = default!;
                 obj.RpcMethod = null!;
                 obj.Params = default;
                 obj.ID = default;
@@ -123,178 +121,6 @@ namespace RamType0.JsonRpc
         static DefaultObjectPool<RpcMethodClosure<TProxy, TDelegate, TParams>> Pool { get; set; } = new DefaultObjectPool<RpcMethodClosure<TProxy, TDelegate, TParams>>(PooledPolicy.Instance);
         #endregion
     }
-
-    public readonly struct DefaultFunctionProxy<TDelegate, TParams,TResult, TInvoker> : JsonRpcMethodDictionary.RpcResponseCreater<TDelegate,TParams>
-        where TInvoker:struct, JsonRpcMethodDictionary.IRpcFunctionInvoker<TDelegate,TParams,TResult>
-                    where TDelegate : Delegate
-            where TParams : IMethodParams
-    {
-        public void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponser responser, TDelegate rpcMethod, TParams parameters, ID? id = null)
-        {
-            TResult result;
-            try
-            {
-                result = default(TInvoker).Invoke(rpcMethod, parameters);
-            }
-            catch (Exception e)
-            {
-                if (id is ID requestID)
-                {
-                    responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
-                }
-                return;
-            }
-            {
-                if (id is ID requestID)
-                {
-                    responser.ResponseResult(new ResultResponse<TResult>(requestID, result));
-                }
-            }
-        }
-
-    }
-    public readonly struct DefaultActionProxy<TDelegate, TParams, TInvoker> : JsonRpcMethodDictionary.RpcResponseCreater<TDelegate, TParams>
-        where TInvoker : struct, JsonRpcMethodDictionary.IRpcActionInvoker<TDelegate, TParams>
-                    where TDelegate : Delegate
-            where TParams : IMethodParams
-    {
-        public void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponser responser, TDelegate rpcMethod, TParams parameters, ID? id = null)
-        {
-            try
-            {
-                default(TInvoker).Invoke(rpcMethod, parameters);
-            }
-            catch (Exception e)
-            {
-                if (id is ID requestID)
-                {
-                    responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
-                }
-                return;
-            }
-            {
-                if (id is ID requestID)
-                {
-                    responser.ResponseResult(ResultResponse.Create(requestID));
-                }
-            }
-        }
-
-    }
-
-    public readonly struct DefaultCancellableActionProxy<TDelegate, TParams, TInvoker>
-        where TInvoker : struct, JsonRpcMethodDictionary.IRpcActionInvoker<TDelegate, TParams>
-                    where TDelegate : Delegate
-            where TParams : ICancellableMethodParams
-    {
-        public void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponser responser, TDelegate rpcMethod, TParams parameters, ID? id = null)
-        {
-            try
-            {
-
-                try
-                {
-                    if (id is ID reqID)
-                    {
-                        var cancellationTokenSource = methodDictionary.GetCancellationTokenSource(reqID);
-                        parameters.CancellationToken = cancellationTokenSource.Token;
-
-                    }
-
-                    default(TInvoker).Invoke(rpcMethod,parameters);
-                }
-                catch (Exception e)
-                {
-                    if (id is ID requestID)
-                    {
-                        if (e is OperationCanceledException)
-                        {
-                            responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));//TODO:キャンセルの別途ハンドリング
-                        }
-                        else
-                        {
-                            responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
-                        }
-                    }
-                    return;
-                }
-                {
-                    if (id is ID requestID)
-                    {
-                        responser.ResponseResult(ResultResponse.Create(requestID));
-                    }
-                }
-            }
-            finally
-            {
-                if (id is ID reqID && methodDictionary.Cancellables.TryRemove(reqID, out var cancellationTokenSource))
-                {
-
-                    methodDictionary.CancellationSourcePool.Return(cancellationTokenSource);
-                }
-            }
-        }
-
-    }
-
-    public readonly struct DefaultCancellableFunctionProxy<TDelegate, TParams, TResult, TInvoker> : JsonRpcMethodDictionary.RpcResponseCreater<TDelegate, TParams>
-      where TInvoker : struct, JsonRpcMethodDictionary.IRpcFunctionInvoker<TDelegate, TParams, TResult>
-                  where TDelegate : Delegate
-          where TParams : ICancellableMethodParams
-    {
-        public void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponser responser, TDelegate rpcMethod, TParams parameters, ID? id = null)
-        {
-            try
-            {
-                TResult result;
-
-                try
-                {
-                    if (id is ID reqID)
-                    {
-                        var cancellationTokenSource = methodDictionary.GetCancellationTokenSource(reqID);
-                        parameters.CancellationToken = cancellationTokenSource.Token;
-
-                    }
-
-                    result = default(TInvoker).Invoke(rpcMethod, parameters);
-                }
-                catch (Exception e)
-                {
-                    if (id is ID requestID)
-                    {
-                        if (e is OperationCanceledException)
-                        {
-                            responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));//TODO:キャンセルの別途ハンドリング
-                        }
-                        else
-                        {
-                            responser.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
-                        }
-                    }
-                    return;
-                }
-                {
-                    if (id is ID requestID)
-                    {
-                        responser.ResponseResult(ResultResponse.Create(requestID, result));
-                    }
-                }
-            }
-            finally
-            {
-                if (id is ID reqID && methodDictionary.Cancellables.TryRemove(reqID, out var cancellationTokenSource))
-                {
-
-                    methodDictionary.CancellationSourcePool.Return(cancellationTokenSource);
-                }
-            }
-        }
-
-    }
-
-  
-
 
 
 }

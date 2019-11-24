@@ -9,22 +9,21 @@ namespace RamType0.JsonRpc
     [JsonFormatter(typeof(ID.Formatter))]
     public readonly struct ID : IEquatable<ID>
     {
-        readonly private EscapedUTF8String? stringValue;
         readonly private long numberValue;
-        public EscapedUTF8String? String => stringValue;
-        public long? Number => stringValue is null ? numberValue : (long?)null;
-        public object Value => stringValue ?? (object)numberValue;
+        public EscapedUTF8String? String { get; }
+        public long? Number => !String.HasValue ? numberValue : (long?)null;
+        public object Value => String ?? (object)numberValue;
         
         public ID(EscapedUTF8String id)
         {
-            stringValue = id;
+            String = id;
             numberValue = default;
         }
 
         public ID(long id)
         {
             numberValue = id;
-            stringValue = null;
+            String = null;
         }
 
         public override bool Equals(object? obj)
@@ -34,25 +33,25 @@ namespace RamType0.JsonRpc
 
         public bool Equals([AllowNull] ID other)
         {
-            if (stringValue is null)
+            if (String.HasValue)
             {
-                return other.stringValue is null & numberValue == other.numberValue;
+                return String == other.String;
             }
             else
             {
-                return stringValue == other.stringValue;
+                return !other.String.HasValue & numberValue == other.numberValue;
             }
         }
 
         public override int GetHashCode()
         {
-            if(stringValue is null)
+            if (String.HasValue)
             {
-                return numberValue.GetHashCode();
+                return String.GetHashCode();
             }
             else
             {
-                return stringValue.GetHashCode();
+                return numberValue.GetHashCode();
             }
         }
 
@@ -70,16 +69,12 @@ namespace RamType0.JsonRpc
 
             public ID Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
             {
-                switch (reader.GetCurrentJsonToken())
+                return (reader.GetCurrentJsonToken()) switch
                 {
-
-                    case JsonToken.Number:
-                        return new ID(reader.ReadInt64());
-                    case JsonToken.String:
-                        return new ID(formatterResolver.GetFormatter<EscapedUTF8String>().Deserialize(ref reader,formatterResolver));
-                    default:
-                        throw new JsonParsingException("Expected number or string");
-                }
+                    JsonToken.Number => new ID(reader.ReadInt64()),
+                    JsonToken.String => new ID(formatterResolver.GetFormatter<EscapedUTF8String>().Deserialize(ref reader, formatterResolver)),
+                    _ => throw new JsonParsingException("Expected number or string"),
+                };
             }
 
             public void Serialize(ref JsonWriter writer, ID value, IJsonFormatterResolver formatterResolver)
@@ -90,7 +85,7 @@ namespace RamType0.JsonRpc
             public static void Serialize(ref JsonWriter writer, ID value)
             {
                 
-                if(value.stringValue is EscapedUTF8String str)
+                if(value.String is EscapedUTF8String str)
                 {
                     writer.WriteString(str);
                 }
@@ -104,18 +99,13 @@ namespace RamType0.JsonRpc
 
                 public ID? Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
                 {
-                    switch (reader.GetCurrentJsonToken())
+                    return (reader.GetCurrentJsonToken()) switch
                     {
-
-                        case JsonToken.Number:
-                            return new ID(reader.ReadInt64());
-                        case JsonToken.String:
-                            return new ID(formatterResolver.GetFormatter<EscapedUTF8String>().Deserialize(ref reader, formatterResolver));
-                        case JsonToken.Null:
-                            return null;
-                        default:
-                            throw new JsonParsingException("Expected number or string or null");
-                    }
+                        JsonToken.Number => new ID(reader.ReadInt64()),
+                        JsonToken.String => new ID(formatterResolver.GetFormatter<EscapedUTF8String>().Deserialize(ref reader, formatterResolver)),
+                        JsonToken.Null => (ID?)null,
+                        _ => throw new JsonParsingException("Expected number or string or null"),
+                    };
                 }
 
                 public void Serialize(ref JsonWriter writer, ID? value, IJsonFormatterResolver formatterResolver)

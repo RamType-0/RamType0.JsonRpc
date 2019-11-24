@@ -16,6 +16,8 @@ namespace RamType0.JsonRpc
             public static Type Create<T>(Type paramsType, ReadOnlySpan<FieldInfo> argumentFields)
                 where T:Delegate
             {
+                VerifyTIsAccessible<T>();
+
                 var builder = ModuleBuilder.DefineType($"{typeof(T).FullName}({paramsType.FullName}).Proxy", TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Class, typeof(ValueType));
                 var invokeMethod = typeof(T).GetMethod("Invoke")!;
                 var returnType = invokeMethod.ReturnType;
@@ -62,6 +64,23 @@ namespace RamType0.JsonRpc
                     }
                 }
                 return builder.CreateType()!;
+            }
+
+            private static void VerifyTIsAccessible<T>() where T : Delegate
+            {
+                var type = typeof(T);
+                while (true)
+                {
+                    if (type.IsNotPublic)
+                    {
+                        throw new ArgumentException($"{typeof(T).Name} is inaccessible. mark it delegate and it parent class as public.");
+                    }
+                    type = type.DeclaringType!;
+                    if (type is null)
+                    {
+                        break;
+                    }
+                }
             }
         }
     }

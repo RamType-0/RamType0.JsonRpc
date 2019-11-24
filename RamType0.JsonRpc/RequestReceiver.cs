@@ -16,15 +16,15 @@ namespace RamType0.JsonRpc
 {
     public class RequestReceiver
     {
-        public RequestReceiver(JsonRpcMethodDictionary rpcMethodDictionary, IResponser responser, IJsonFormatterResolver jsonFormatterResolver)
+        public RequestReceiver(JsonRpcMethodDictionary rpcMethodDictionary, IResponseOutput output, IJsonFormatterResolver jsonFormatterResolver)
         {
             RpcMethodDictionary = rpcMethodDictionary;
-            Responser = responser;
+            Output = output;
             JsonFormatterResolver = jsonFormatterResolver;
         }
 
         JsonRpcMethodDictionary RpcMethodDictionary { get; }
-        IResponser Responser { get; }
+        IResponseOutput Output { get; }
         IJsonFormatterResolver JsonFormatterResolver { get; }
         /// <summary>
         /// ArrayPool
@@ -38,12 +38,12 @@ namespace RamType0.JsonRpc
         /// <returns>リクエストの返答までを含む処理の完了を示す<see cref="Task"/>。</returns>
         ValueTask ResolveAsync(ArraySegment<byte> segment)
         {
-            return RequestObjectSolver.ResolveRequestAsync(RpcMethodDictionary, Responser, segment, JsonFormatterResolver);
+            return RequestObjectResolver.ResolveAsync(RpcMethodDictionary, Output, segment, JsonFormatterResolver);
         }
 
         public void Resolve(ArraySegment<byte> segment)
         {
-            RequestObjectSolver.ResolveRequest(RpcMethodDictionary, Responser, segment, JsonFormatterResolver);
+            RequestObjectResolver.Resolve(RpcMethodDictionary, Output, segment, JsonFormatterResolver);
         }
         /// <summary>
         /// 現状の実装では配列にコピーしていますが、将来的に内部差し替えだけでSpan対応できるように。
@@ -108,6 +108,8 @@ namespace RamType0.JsonRpc
 
                 public override bool Return(CopiedResolveClosure obj)
                 {
+                    obj.Receiver = default!;
+                    obj.Json = default;
                     return true;
                 }
             }
@@ -141,10 +143,10 @@ namespace RamType0.JsonRpc
             {
 
                 var buf = ArrayPool.Rent(65536);
-                var len = FillFromStream(stream, ref buf);
+                _ = FillFromStream(stream, ref buf);
 
                 // when token is number, can not use from pool(can not find end line).
-                var token = new JsonReader(buf).GetCurrentJsonToken();
+                //var token = new JsonReader(buf).GetCurrentJsonToken();
                 /*if (token == JsonToken.Number)
                 {
                      
@@ -193,7 +195,7 @@ namespace RamType0.JsonRpc
 
        
     }
-    public struct RequestReceiverObject
+    struct RequestObject
     {
         [JsonFormatter(typeof(JsonRpcVersion.Formatter.Nullable))]
         [DataMember(Name = "jsonrpc")]
@@ -207,24 +209,20 @@ namespace RamType0.JsonRpc
         [DataMember(Name = "id")]
         public ID? ID { get; set; }
     }
-
     public struct DummyParams
     {
 
     }
-
-    internal static class RequestObjectSolver// : IJsonFormatter<RequestReceiverObject>
+    public static class RequestObjectResolver// : IJsonFormatter<RequestReceiverObject>
     {
-        //internal static InvokingFormatter Instance { get; } = new InvokingFormatter();//=> instance ??= new ResolvingFormatter();
-
-        public static ValueTask ResolveRequestAsync(JsonRpcMethodDictionary methodDictionary, IResponser responser, ArraySegment<byte> json, IJsonFormatterResolver formatterResolver)
+        public static ValueTask ResolveAsync(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, ArraySegment<byte> json, IJsonFormatterResolver formatterResolver)
         {
             var reader = new JsonReader(json.Array, json.Offset);
             var copyReader = reader;
-            RequestReceiverObject request;
+            RequestObject request;
             try
             {
-                request = formatterResolver.GetFormatter<RequestReceiverObject>().Deserialize(ref reader, formatterResolver);
+                request = formatterResolver.GetFormatter<RequestObject>().Deserialize(ref reader, formatterResolver);
             }
             catch (JsonParsingException ex)
             {
@@ -240,18 +238,18 @@ namespace RamType0.JsonRpc
                     if (readerOffset >= jsonTerminal)//1個分丸ごとスキップ、さらに空白もスキップした後にまだ終端に達していなかったらおかしい
                     //Jsonの文法はOK=InvalidRequest
                     {
-                        return new ValueTask(Task.Run(() => responser.ResponseError(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment)))));//TODO:ここもクロージャプーリングする
+                        return new ValueTask(Task.Run(() => output.ResponseError(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment)))));//TODO:ここもクロージャプーリングする
                     }
                     else
                     {
-                        return new ValueTask( Task.Run(() => responser.ResponseException(ErrorResponse.ParseError(ex))));
+                        return new ValueTask( Task.Run(() => output.ResponseException(ErrorResponse.ParseError(ex))));
                     }
                     
                 }
                 catch (JsonParsingException e)
                 {
                     //正常にこのオブジェクトを読み飛ばせない=Jsonの文法がおかしい=ParseError
-                    return new ValueTask( Task.Run(() => responser.ResponseException(ErrorResponse.ParseError(e))));//TODO:ここもクロージャプーリングする
+                    return new ValueTask( Task.Run(() => output.ResponseException(ErrorResponse.ParseError(e))));//TODO:ここもクロージャプーリングする
                 }
 
             }
@@ -260,30 +258,29 @@ namespace RamType0.JsonRpc
             {
                 if (request.Method is EscapedUTF8String MethodName)
                 {
-                    return methodDictionary.InvokeAsync(responser, MethodName, request.ID, ref copyReader, formatterResolver);
+                    return methodDictionary.InvokeAsync(output, MethodName, request.ID, ref copyReader, formatterResolver);
                 }
                 else
                 {
-                    return new ValueTask( Task.Run(() => responser.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing.")))));
+                    return new ValueTask( Task.Run(() => output.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing.")))));
                 }
             }
             else
             {
-                return new ValueTask(Task.Run(() => responser.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing.")))));
+                return new ValueTask(Task.Run(() => output.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing.")))));
             }
 
 
 
         }
-
-        public static void ResolveRequest(JsonRpcMethodDictionary methodDictionary, IResponser responser, ArraySegment<byte> json, IJsonFormatterResolver formatterResolver)
+        public static void Resolve(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, ArraySegment<byte> json, IJsonFormatterResolver formatterResolver)
         {
             var reader = new JsonReader(json.Array, json.Offset);
             var copyReader = reader;
-            RequestReceiverObject request;
+            RequestObject request;
             try
             {
-                request = formatterResolver.GetFormatter<RequestReceiverObject>().Deserialize(ref reader, formatterResolver);
+                request = formatterResolver.GetFormatter<RequestObject>().Deserialize(ref reader, formatterResolver);
             }
             catch (JsonParsingException ex)
             {
@@ -299,12 +296,12 @@ namespace RamType0.JsonRpc
                     if (readerOffset >= jsonTerminal)//1個分丸ごとスキップ、さらに空白もスキップした後にまだ終端に達していなかったらおかしい
                     //Jsonの文法はOK=InvalidRequest
                     {
-                        responser.ResponseError(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment)));//TODO:ここもクロージャプーリングする
+                        output.ResponseError(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment)));//TODO:ここもクロージャプーリングする
                         return;
                     }
                     else
                     {
-                        responser.ResponseException(ErrorResponse.ParseError(ex));
+                        output.ResponseException(ErrorResponse.ParseError(ex));
                         return;
                     }
 
@@ -312,7 +309,7 @@ namespace RamType0.JsonRpc
                 catch (JsonParsingException e)
                 {
                     //正常にこのオブジェクトを読み飛ばせない=Jsonの文法がおかしい=ParseError
-                    responser.ResponseException(ErrorResponse.ParseError(e));
+                    output.ResponseException(ErrorResponse.ParseError(e));
                     return;
                 }
 
@@ -322,26 +319,24 @@ namespace RamType0.JsonRpc
             {
                 if (request.Method is EscapedUTF8String MethodName)
                 {
-                    methodDictionary.Invoke(responser, MethodName, request.ID, ref copyReader, formatterResolver);
+                    methodDictionary.Invoke(output, MethodName, request.ID, ref copyReader, formatterResolver);
                     return;
                 }
                 else
                 {
-                    responser.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing.")));
+                    output.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing.")));
                     return;
                 }
             }
             else
             {
-                responser.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing.")));
+                output.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing.")));
                 return;
             }
 
 
 
         }
-
-
     }
 
 }
