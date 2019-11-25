@@ -55,9 +55,17 @@ namespace RamType0.JsonRpc.Test
 
         {
             
-            var responser = new DefaultResponseOutput(Console.OpenStandardOutput());
+            var responser = new DummyResponseOutput();
             var receiver = new RequestReceiver(dic, responser, JsonSerializer.DefaultResolver);
             return receiver;
+        }
+
+        class DummyResponseOutput : IResponseOutput
+        {
+            ValueTask IResponseOutput.Response<T>(T response)
+            {
+                return new ValueTask();
+            }
         }
 
         [Test]

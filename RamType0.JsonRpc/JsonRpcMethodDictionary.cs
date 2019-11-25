@@ -9,9 +9,9 @@ using System.Collections.Concurrent;
 
 namespace RamType0.JsonRpc
 {
-    public class JsonRpcMethodDictionary
+    public class JsonRpcMethodDictionary : IDisposable
     {
-        Dictionary<EscapedUTF8String, RpcEntry> RpcMethods { get; } = new Dictionary<EscapedUTF8String, RpcEntry>();
+        Dictionary<EscapedUTF8String, RpcEntry> RpcMethods { get; set; } = new Dictionary<EscapedUTF8String, RpcEntry>();
         public ValueTask InvokeAsync(IResponseOutput output,EscapedUTF8String methodName,ID? id,ref JsonReader reader,IJsonFormatterResolver formatterResolver)
         {
             if(RpcMethods.TryGetValue(methodName,out var invoker))
@@ -22,7 +22,7 @@ namespace RamType0.JsonRpc
             {
                 if (id is ID reqID)
                 {
-                    return new ValueTask(Task.Run(() => output.ResponseError(ErrorResponse.MethodNotFound(reqID, methodName.ToString()))));
+                    return output.ResponseError(ErrorResponse.MethodNotFound(reqID, methodName.ToString()));
                 }
                 else
                 {
@@ -53,7 +53,7 @@ namespace RamType0.JsonRpc
         public void Register(string methodName,RpcEntry entry)
         {
             var rpcMethods = RpcMethods;
-            lock (rpcMethods)
+            //lock (rpcMethods)
             {
                 rpcMethods.Add(EscapedUTF8String.FromUnEscaped(methodName), entry);
             }
@@ -91,6 +91,16 @@ namespace RamType0.JsonRpc
         }
         internal ConcurrentDictionary<ID, CancellationTokenSource> Cancellables { get; } = new ConcurrentDictionary<ID, CancellationTokenSource>();
         
+
+        public void Dispose()
+        {
+            foreach (var entry in RpcMethods.Values)
+            {
+                entry.Dispose();
+            }
+            RpcMethods = null!;
+
+        }
  
     }
     public abstract class RpcEntry : IDisposable
@@ -201,7 +211,7 @@ namespace RamType0.JsonRpc
             }
         Invoke:
             //paramsが読み取れた
-            RpcMethodClosure<TProxy, TDelegate, TParams>.InvokeWithLogging(methodDictionary, output, Proxy, RpcMethod, parameters, id);
+            RpcMethodClosure<TProxy, TDelegate, TParams>.Invoke(methodDictionary, output, Proxy, RpcMethod, parameters, id);
             return;
         }
 
@@ -241,7 +251,7 @@ namespace RamType0.JsonRpc
                                     if (id is ID reqID)
                                     {
                                         var paramsJson = Encoding.UTF8.GetString(copyReader.ReadNextBlockSegment());//このメソッドが呼ばれた時点でParseErrorはありえない
-                                        return new ValueTask(Task.Run(() => output.ResponseError(ErrorResponse.InvalidParams(reqID, paramsJson))));
+                                        return output.ResponseError(ErrorResponse.InvalidParams(reqID, paramsJson));
                                     }
                                     else
                                     {
@@ -269,7 +279,7 @@ namespace RamType0.JsonRpc
                             {
                                 if (id is ID reqID)
                                 {
-                                    return new ValueTask(Task.Run(() => output.ResponseError(ErrorResponse.InvalidParams(reqID, "(not exists)"))));
+                                    return output.ResponseError(ErrorResponse.InvalidParams(reqID, "(not exists)"));
                                 }
                                 else
                                 {
@@ -287,8 +297,9 @@ namespace RamType0.JsonRpc
             }
         Invoke:
             //paramsが読み取れた
-            var closure = RpcMethodClosure<TProxy, TDelegate, TParams>.GetClosure(methodDictionary, output, Proxy, RpcMethod, parameters, id);
-            return new ValueTask(Task.Run(closure.InvokeAction));
+            return RpcMethodClosure<TProxy, TDelegate, TParams>.Invoke(methodDictionary, output, Proxy, RpcMethod, parameters, id);
+            //var closure = RpcMethodClosure<TProxy, TDelegate, TParams>.GetClosure(methodDictionary, output, Proxy, RpcMethod, parameters, id);
+            //return new ValueTask(Task.Run(closure.InvokeAction));
 
         }
         public override void Dispose()

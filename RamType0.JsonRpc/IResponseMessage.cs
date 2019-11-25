@@ -84,11 +84,13 @@ namespace RamType0.JsonRpc
             this.Result = result;
             this.ID = id;
         }
+        
     }
+    
     /// <summary>
     /// 戻り値を持たないJsonRpcメソッドが正常に完了した際の応答を示します。
     /// </summary>
-    public struct ResultResponse : IResultResponse<ResultResponse.VoidMethodResult>
+    public struct ResultResponse : IResultResponse<ResultResponse.NullResult>
     {
         [DataMember(Name = "jsonrpc")]
         public JsonRpcVersion Version => default;
@@ -97,7 +99,7 @@ namespace RamType0.JsonRpc
         /// nullとしてシリアライズさせるためのダミーです
         /// </summary>
         [DataMember(Name = "result")] 
-        public VoidMethodResult Result => default;
+        public NullResult Result => default;
         [DataMember(Name = "id")]
         public ID ID { get; set; }
 
@@ -116,11 +118,11 @@ namespace RamType0.JsonRpc
             return new ResultResponse(id);
         }
         [JsonFormatter(typeof(Formatter))]
-        public readonly struct VoidMethodResult
+        public readonly struct NullResult
         {
-            public sealed class Formatter : IJsonFormatter<VoidMethodResult>
+            public sealed class Formatter : IJsonFormatter<NullResult>
             {
-                public VoidMethodResult Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+                public NullResult Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
                 {
                     if (!reader.ReadIsNull())
                     {
@@ -129,7 +131,7 @@ namespace RamType0.JsonRpc
                     return default;
                 }
 
-                public void Serialize(ref JsonWriter writer, VoidMethodResult value, IJsonFormatterResolver formatterResolver)
+                public void Serialize(ref JsonWriter writer, NullResult value, IJsonFormatterResolver formatterResolver)
                 {
                     writer.WriteNull();
 

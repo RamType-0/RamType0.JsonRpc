@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Utf8Json;
+using System.Threading.Tasks;
 namespace RamType0.JsonRpc
 {
+    /*
     /// <summary>
     /// スレッドセーフ、標準的な<see cref="IResponseOutput"/>の実装です。
     /// </summary>
@@ -17,7 +19,7 @@ namespace RamType0.JsonRpc
 
         Stream Output { get; }
 
-        void Response<T>(T response) where T :  IResponseMessage
+        async ValueTask Response<T>(T response) where T :  IResponseMessage
         {
             
             JsonSerializer.Serialize(Output, response);
@@ -26,24 +28,37 @@ namespace RamType0.JsonRpc
 
         void IResponseOutput.Response<T>(T response)
         {
-            Response(response);
+            return Response(response);
         }
     }
-
+    */
     /// <summary>
     /// 最終的な<see cref="IResponseMessage"/>の出力を行うクラスを示します。
     /// </summary>
     public interface IResponseOutput
     {
-        protected void Response<T>(T response) where T :notnull, IResponseMessage;
-        public void ResponseResult<TResult>(ResultResponse<TResult> response)
+        protected ValueTask Response<T>(T response) where T :notnull, IResponseMessage;
+        /// <summary>
+        /// response.Resultが<see langword="null"/>の場合、非ジェネリックのResultResponseに明示的に変換する必要があることに注意してください。
+        /// </summary>
+        /// <typeparam name="TResult"></typeparam>
+        /// <param name="response"></param>
+        /// <returns></returns>
+        public ValueTask ResponseResult<TResult>(ResultResponse<TResult> response)
         {
-            Response(response);
+            if(response.Result == null)
+            {
+                return Response(ResultResponse.Create(response.ID));
+            }
+            else
+            {
+                return Response(response);
+            }
         }
 
-        public void ResponseResult(ResultResponse response)
+        public ValueTask ResponseResult(ResultResponse response)
         {
-            Response(response);
+            return Response(response);
         }
         /// <summary>
         /// できる限り<see cref="ResponseException{TResponse, TError}(TResponse)"/>を利用してください。
@@ -51,9 +66,9 @@ namespace RamType0.JsonRpc
         /// <typeparam name="TResponse"></typeparam>
         /// <typeparam name="TError"></typeparam>
         /// <param name="response"></param>
-        protected internal void ResponseError<TResponse>(TResponse response) where TResponse :notnull, IErrorResponse
+        protected internal ValueTask ResponseError<TResponse>(TResponse response) where TResponse :notnull, IErrorResponse
         {
-            Response(response);
+            return Response(response);
         }
         /// <summary>
         /// <see cref="OperationCanceledException"/>など特殊な例外に対して別のエラーコードを割り振りたい場合にオーバーライドしてください。
@@ -61,9 +76,9 @@ namespace RamType0.JsonRpc
         /// <typeparam name="TResponse"></typeparam>
         /// <typeparam name="TError"></typeparam>
         /// <param name="response"></param>
-        public void ResponseException<T>(T response)where T:IErrorResponse<Exception>
+        public ValueTask ResponseException<T>(T response)where T:IErrorResponse<Exception>
         {
-            Response(response);
+            return Response(response);
         }
     }
    

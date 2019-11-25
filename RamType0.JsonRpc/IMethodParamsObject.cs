@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Utf8Json;
 
 namespace RamType0.JsonRpc
@@ -107,7 +108,7 @@ namespace RamType0.JsonRpc
         /// <param name="rpcMethod"></param>
         /// <param name="parameters"></param>
         /// <param name="id"></param>
-        void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null);
+        ValueTask DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null);
     }
 
     public readonly struct DefaultFunctionProxy<TDelegate, TParams, TResult, TInvoker> : IRpcMethodProxy<TDelegate, TParams>
@@ -122,7 +123,7 @@ namespace RamType0.JsonRpc
 
         public TInvoker Invoker { get; }
 
-        public void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null)
+        public ValueTask DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null)
         {
             TResult result;
             try
@@ -133,15 +134,16 @@ namespace RamType0.JsonRpc
             {
                 if (id is ID requestID)
                 {
-                    output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                    return output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
                 }
-                return;
+                return new ValueTask();
             }
             {
                 if (id is ID requestID)
                 {
-                    output.ResponseResult(new ResultResponse<TResult>(requestID, result));
+                    return output.ResponseResult(new ResultResponse<TResult>(requestID, result));
                 }
+                return new ValueTask();
             }
         }
 
@@ -157,7 +159,7 @@ namespace RamType0.JsonRpc
         }
 
         public TInvoker Invoker { get; }
-        public void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null)
+        public ValueTask DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null)
         {
             try
             {
@@ -167,15 +169,16 @@ namespace RamType0.JsonRpc
             {
                 if (id is ID requestID)
                 {
-                    output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                    return output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
                 }
-                return;
+                return new ValueTask();
             }
             {
                 if (id is ID requestID)
                 {
-                    output.ResponseResult(ResultResponse.Create(requestID));
+                    return output.ResponseResult(ResultResponse.Create(requestID));
                 }
+                return new ValueTask();
             }
         }
 
@@ -192,7 +195,7 @@ namespace RamType0.JsonRpc
         }
 
         public TInvoker Invoker { get; }
-        public void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null)
+        public ValueTask DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null)
         {
             try
             {
@@ -214,20 +217,21 @@ namespace RamType0.JsonRpc
                     {
                         if (e is OperationCanceledException)
                         {
-                            output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));//TODO:キャンセルの別途ハンドリング
+                            return output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));//TODO:キャンセルの別途ハンドリング
                         }
                         else
                         {
-                            output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                            return output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
                         }
                     }
-                    return;
+                    return new ValueTask();
                 }
                 {
                     if (id is ID requestID)
                     {
-                        output.ResponseResult(ResultResponse.Create(requestID));
+                        return output.ResponseResult(ResultResponse.Create(requestID));
                     }
+                    return new ValueTask();
                 }
             }
             finally
@@ -238,6 +242,7 @@ namespace RamType0.JsonRpc
                     methodDictionary.CancellationSourcePool.Return(cancellationTokenSource);
                 }
             }
+            
         }
 
     }
@@ -253,7 +258,7 @@ namespace RamType0.JsonRpc
         }
 
         public TInvoker Invoker { get; }
-        public void DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null)
+        public ValueTask DelegateResponse(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, TDelegate rpcMethod, TParams parameters, ID? id = null)
         {
             try
             {
@@ -276,20 +281,21 @@ namespace RamType0.JsonRpc
                     {
                         if (e is OperationCanceledException)
                         {
-                            output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));//TODO:キャンセルの別途ハンドリング
+                            return output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));//TODO:キャンセルの別途ハンドリング
                         }
                         else
                         {
-                            output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                            return output.ResponseException(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
                         }
                     }
-                    return;
+                    return new ValueTask();
                 }
                 {
                     if (id is ID requestID)
                     {
-                        output.ResponseResult(ResultResponse.Create(requestID, result));
+                        return output.ResponseResult(ResultResponse.Create(requestID, result));
                     }
+                    return new ValueTask();
                 }
             }
             finally

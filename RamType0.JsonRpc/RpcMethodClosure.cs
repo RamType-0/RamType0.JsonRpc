@@ -28,7 +28,7 @@ namespace RamType0.JsonRpc
         {
             try
             {
-                InvokeWithLogging(RpcMethodDictionary, Output,Proxy,RpcMethod, Params, ID);
+                _ = Invoke(RpcMethodDictionary, Output,Proxy,RpcMethod, Params, ID);
             }
             finally
             {
@@ -36,21 +36,11 @@ namespace RamType0.JsonRpc
             }
         }
 
-        public static void InvokeWithLogging(JsonRpcMethodDictionary methodDictionary, IResponseOutput output,TProxy proxy, TDelegate rpcMethod, TParams parameters, ID? id)
+        public static ValueTask Invoke(JsonRpcMethodDictionary methodDictionary, IResponseOutput output,TProxy proxy, TDelegate rpcMethod, TParams parameters, ID? id)
         {
-            try
-            {
-                proxy.DelegateResponse(methodDictionary, output,rpcMethod ,parameters, id);
-            }
-            catch (Exception e)
-            {
-
-                var errorOutput = Stream.Synchronized(Console.OpenStandardError());//ここあたりのメソッドまともに使ったこと無いのでこれでも危険かもしれない
-                errorOutput.Write(ErrorLogHeader);
-                var unHandledException = JsonSerializer.SerializeUnsafe(e);
-                errorOutput.Write(unHandledException);
-                throw;
-            }
+            
+            return proxy.DelegateResponse(methodDictionary, output,rpcMethod ,parameters, id);
+            
         }
 
         static byte[] ErrorLogHeader { get; } = Encoding.UTF8.GetBytes($"Unhandled exception from {typeof(TProxy).Name}. \n");

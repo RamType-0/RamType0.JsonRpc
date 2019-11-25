@@ -11,7 +11,6 @@ using System.Threading.Tasks.Sources;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Utf8Json;
-
 namespace RamType0.JsonRpc
 {
     public class RequestReceiver
@@ -32,10 +31,10 @@ namespace RamType0.JsonRpc
         ArrayPool<byte> ArrayPool { get; } = ArrayPool<byte>.Shared;
 
         /// <summary>
-        /// Taskがreturnされた時点で、引数のArraySegmentに対する操作は終了しています。
+        /// 
         /// </summary>
         /// <param name="segment"></param>
-        /// <returns>リクエストの返答までを含む処理の完了を示す<see cref="Task"/>。</returns>
+        /// <returns>リクエストの返答までを含む処理の完了を示す<see cref="ValueTask"/>。</returns>
         ValueTask ResolveAsync(ArraySegment<byte> segment)
         {
             return RequestObjectResolver.ResolveAsync(RpcMethodDictionary, Output, segment, JsonFormatterResolver);
@@ -195,7 +194,8 @@ namespace RamType0.JsonRpc
 
        
     }
-    struct RequestObject
+    
+    public struct RequestObject
     {
         [JsonFormatter(typeof(JsonRpcVersion.Formatter.Nullable))]
         [DataMember(Name = "jsonrpc")]
@@ -238,18 +238,18 @@ namespace RamType0.JsonRpc
                     if (readerOffset >= jsonTerminal)//1個分丸ごとスキップ、さらに空白もスキップした後にまだ終端に達していなかったらおかしい
                     //Jsonの文法はOK=InvalidRequest
                     {
-                        return new ValueTask(Task.Run(() => output.ResponseError(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment)))));//TODO:ここもクロージャプーリングする
+                        return output.ResponseError(ErrorResponse.InvalidRequest(Encoding.UTF8.GetString(jsonSegment)));//TODO:ここもクロージャプーリングする
                     }
                     else
                     {
-                        return new ValueTask( Task.Run(() => output.ResponseException(ErrorResponse.ParseError(ex))));
+                        return output.ResponseException(ErrorResponse.ParseError(ex));
                     }
                     
                 }
                 catch (JsonParsingException e)
                 {
                     //正常にこのオブジェクトを読み飛ばせない=Jsonの文法がおかしい=ParseError
-                    return new ValueTask( Task.Run(() => output.ResponseException(ErrorResponse.ParseError(e))));//TODO:ここもクロージャプーリングする
+                    return output.ResponseException(ErrorResponse.ParseError(e));//TODO:ここもクロージャプーリングする
                 }
 
             }
@@ -262,12 +262,12 @@ namespace RamType0.JsonRpc
                 }
                 else
                 {
-                    return new ValueTask( Task.Run(() => output.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing.")))));
+                    return output.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"method\" property is missing.")));
                 }
             }
             else
             {
-                return new ValueTask(Task.Run(() => output.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing.")))));
+                return output.ResponseError(new ErrorResponse(request.ID, new ErrorObject(ErrorCode.InvalidRequest, "\"jsonrpc\" property is missing.")));
             }
 
 
