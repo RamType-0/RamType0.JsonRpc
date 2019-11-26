@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Reflection.Emit;
-using static RamType0.JsonRpc.JsonRpcMethodDictionary;
+using RamType0.JsonRpc.Server;
 
 namespace RamType0.JsonRpc
 {

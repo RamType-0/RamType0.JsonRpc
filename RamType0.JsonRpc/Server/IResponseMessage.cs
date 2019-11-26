@@ -3,7 +3,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using Utf8Json;
 
-namespace RamType0.JsonRpc
+namespace RamType0.JsonRpc.Server
 {
     public interface IResponseMessage : IMessage
     {

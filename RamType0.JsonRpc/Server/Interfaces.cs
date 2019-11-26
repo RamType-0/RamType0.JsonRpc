@@ -1,22 +1,9 @@
 ﻿using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Utf8Json;
 
-namespace RamType0.JsonRpc
+namespace RamType0.JsonRpc.Server
 {
-    public interface IMethodParams
-    {
-
-    }
-    public interface IEmptyParams : IMethodParams
-    {
-
-    }
-    public interface ICancellableMethodParams : IMethodParams
-    {
-        public CancellationToken CancellationToken { get; set; }
-    }
     public struct DefaultObjectStyleParamsDeserializer<T> : IObjectStyleParamsDeserializer<T>
             where T : struct, IMethodParams
     {
@@ -26,7 +13,7 @@ namespace RamType0.JsonRpc
         }
     }
     public interface IParamsDeserializer<T>
-        where T : struct, IMethodParams
+        where T : IMethodParams
     {
         T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
     }

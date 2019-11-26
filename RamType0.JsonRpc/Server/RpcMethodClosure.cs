@@ -9,19 +9,19 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.ObjectPool;
 using Utf8Json;
 
-namespace RamType0.JsonRpc
+namespace RamType0.JsonRpc.Server
 {
     public sealed class RpcMethodClosure<TProxy, TDelegate, TParams>
          where TProxy : notnull,IRpcMethodProxy<TDelegate, TParams>
             where TDelegate : Delegate
-            where TParams : struct, IMethodParams
+            where TParams : IMethodParams
     {
         public JsonRpcMethodDictionary RpcMethodDictionary { get; private set; } = default!;
 
         public IResponseOutput Output { get; private set; } = default!;
         public TProxy Proxy { get; private set; } = default!;
         public TDelegate RpcMethod { get; private set; } = default!;
-        public TParams Params { get; private set; }
+        public TParams Params { get; private set; } = default!;
         public ID? ID { get; private set; }
         public Action InvokeAction { get; }
         public void InvokeWithPoolingAndLogging()
@@ -100,7 +100,7 @@ namespace RamType0.JsonRpc
                 obj.Output = null!;
                 obj.Proxy = default!;
                 obj.RpcMethod = null!;
-                obj.Params = default;
+                obj.Params = default!;
                 obj.ID = default;
                 
                 return true;

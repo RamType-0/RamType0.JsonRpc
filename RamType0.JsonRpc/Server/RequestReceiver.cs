@@ -11,7 +11,7 @@ using System.Threading.Tasks.Sources;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Utf8Json;
-namespace RamType0.JsonRpc
+namespace RamType0.JsonRpc.Server
 {
     public class RequestReceiver
     {
@@ -195,7 +195,7 @@ namespace RamType0.JsonRpc
        
     }
     
-    public struct RequestObject
+    public struct RequestMessage
     {
         [JsonFormatter(typeof(JsonRpcVersion.Formatter.Nullable))]
         [DataMember(Name = "jsonrpc")]
@@ -219,10 +219,10 @@ namespace RamType0.JsonRpc
         {
             var reader = new JsonReader(json.Array, json.Offset);
             var copyReader = reader;
-            RequestObject request;
+            RequestMessage request;
             try
             {
-                request = formatterResolver.GetFormatter<RequestObject>().Deserialize(ref reader, formatterResolver);
+                request = formatterResolver.GetFormatter<RequestMessage>().Deserialize(ref reader, formatterResolver);
             }
             catch (JsonParsingException ex)
             {
@@ -277,10 +277,10 @@ namespace RamType0.JsonRpc
         {
             var reader = new JsonReader(json.Array, json.Offset);
             var copyReader = reader;
-            RequestObject request;
+            RequestMessage request;
             try
             {
-                request = formatterResolver.GetFormatter<RequestObject>().Deserialize(ref reader, formatterResolver);
+                request = formatterResolver.GetFormatter<RequestMessage>().Deserialize(ref reader, formatterResolver);
             }
             catch (JsonParsingException ex)
             {

@@ -48,14 +48,20 @@ namespace RamType0.JsonRpc
 
         public static EscapedUTF8String FromUnEscaped(string text)
         {
+            byte[] array = GetEscapedUTF8(text);
+            return new EscapedUTF8String(array);
+        }
+
+        private static byte[] GetEscapedUTF8(string text)
+        {
             var writer = new JsonWriter();
             writer.WriteString(text);
             var buffer = writer.GetBuffer();
-            var array = new byte[buffer.Count-2];
-            Buffer.BlockCopy(buffer.Array!, buffer.Offset+1, array, 0, array.Length);
-            return new EscapedUTF8String(array);
+            var array = new byte[buffer.Count - 2];
+            Buffer.BlockCopy(buffer.Array!, buffer.Offset + 1, array, 0, array.Length);
+            return array;
         }
-        
+
         /// <summary>
         /// エスケープした状態の文字列のバイト数を示します。文字列リテラルの両端のダブルクォーテーションは含まれません。
         /// </summary>

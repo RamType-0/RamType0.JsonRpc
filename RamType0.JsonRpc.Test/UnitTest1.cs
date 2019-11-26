@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Text;
 using System.Threading;
 using static RamType0.JsonRpc.Emit;
+using RamType0.JsonRpc.Server;
 
 namespace RamType0.JsonRpc.Test
 {

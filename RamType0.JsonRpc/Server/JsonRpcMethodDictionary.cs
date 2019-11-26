@@ -7,7 +7,7 @@ using System.Threading;
 using Microsoft.Extensions.ObjectPool;
 using System.Collections.Concurrent;
 
-namespace RamType0.JsonRpc
+namespace RamType0.JsonRpc.Server
 {
     public class JsonRpcMethodDictionary : IDisposable
     {
@@ -118,7 +118,7 @@ namespace RamType0.JsonRpc
     public sealed class RpcEntry<TProxy, TDelegate, TParams, TDeserializer> : RpcEntry
         where TProxy : notnull, IRpcMethodProxy<TDelegate, TParams>
         where TDelegate : Delegate
-        where TParams : struct, IMethodParams
+        where TParams : IMethodParams
         where TDeserializer : notnull, IParamsDeserializer<TParams>
     {
         public RpcEntry(TProxy proxy, TDelegate rpcMethod, TDeserializer paramsDeserializer)
@@ -126,10 +126,13 @@ namespace RamType0.JsonRpc
             Proxy = proxy;
             RpcMethod = rpcMethod;
             ParamsDeserializer = paramsDeserializer;
+            ParamsIsEmpty = typeof(IEmptyParams).IsAssignableFrom(typeof(TParams));
         }
         public TProxy Proxy { get; private set; }
         public TDelegate RpcMethod { get; private set; }
         public TDeserializer ParamsDeserializer { get; private set; }
+
+        bool ParamsIsEmpty { get; }
 
         public override void ReadParamsAndInvoke(JsonRpcMethodDictionary methodDictionary, IResponseOutput output, ID? id, ref JsonReader reader, IJsonFormatterResolver formatterResolver)
         {
@@ -183,9 +186,9 @@ namespace RamType0.JsonRpc
                         }
                     case JsonToken.EndObject:
                         {
-                            if (default(TParams) is IEmptyParams)
+                            if (ParamsIsEmpty)
                             {
-                                parameters = default;
+                                parameters = default!;
                                 goto Invoke;
                             }
                             else
@@ -270,9 +273,9 @@ namespace RamType0.JsonRpc
                         }
                     case JsonToken.EndObject:
                         {
-                            if (default(TParams) is IEmptyParams)
+                            if (ParamsIsEmpty)
                             {
-                                parameters = default;
+                                parameters = default!;
                                 goto Invoke;
                             }
                             else

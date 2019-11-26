@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using Utf8Json;
 using System.Threading.Tasks;
-namespace RamType0.JsonRpc
+namespace RamType0.JsonRpc.Server
 {
     /*
     /// <summary>
