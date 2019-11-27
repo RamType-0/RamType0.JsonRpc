@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Runtime.Serialization;
-using System.Text;
 using Utf8Json;
 
 namespace RamType0.JsonRpc.Server
@@ -90,7 +89,7 @@ namespace RamType0.JsonRpc.Server
     /// <summary>
     /// 戻り値を持たないJsonRpcメソッドが正常に完了した際の応答を示します。
     /// </summary>
-    public struct ResultResponse : IResultResponse<ResultResponse.NullResult>
+    public struct ResultResponse : IResultResponse<NullResult>
     {
         [DataMember(Name = "jsonrpc")]
         public JsonRpcVersion Version => default;
@@ -117,27 +116,6 @@ namespace RamType0.JsonRpc.Server
         {
             return new ResultResponse(id);
         }
-        [JsonFormatter(typeof(Formatter))]
-        public readonly struct NullResult
-        {
-            public sealed class Formatter : IJsonFormatter<NullResult>
-            {
-                public NullResult Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
-                {
-                    if (!reader.ReadIsNull())
-                    {
-                        throw new JsonParsingException($"Expected null,but \"{Encoding.UTF8.GetString(reader.ReadNextBlockSegment())}\"");
-                    }
-                    return default;
-                }
-
-                public void Serialize(ref JsonWriter writer, NullResult value, IJsonFormatterResolver formatterResolver)
-                {
-                    writer.WriteNull();
-
-                }
-            }
-        }
     }
 
     public struct ErrorResponse<T> : IErrorResponse<T>
@@ -156,23 +134,6 @@ namespace RamType0.JsonRpc.Server
             this.ID = id;
             this.Error = error;
         }
-    }
-    public enum ErrorCode : long
-    {
-        // Defined by JSON RPC
-        ParseError = -32700,
-        InvalidRequest = -32600,
-        MethodNotFound = -32601,
-        InvalidParams = -32602,
-        InternalError = -32603,
-        serverErrorStart = -32099,
-        serverErrorEnd = -32000,
-        ServerNotInitialized = -32002,
-        UnknownErrorCode = -32001,
-
-        // Defined by the language server protocol.
-        //RequestCancelled = -32800,
-        //ContentModified = -32801,
     }
     public struct ErrorObject<T> : IErrorObject<T>
         where T : notnull

@@ -72,7 +72,7 @@ namespace RamType0.JsonRpc
                 return (reader.GetCurrentJsonToken()) switch
                 {
                     JsonToken.Number => new ID(reader.ReadInt64()),
-                    JsonToken.String => new ID(formatterResolver.GetFormatter<EscapedUTF8String>().Deserialize(ref reader, formatterResolver)),
+                    JsonToken.String => new ID(EscapedUTF8String.Formatter.DeserializeSafe(ref reader)),
                     _ => throw new JsonParsingException("Expected number or string"),
                 };
             }
@@ -94,19 +94,38 @@ namespace RamType0.JsonRpc
                     writer.WriteInt64(value.numberValue);
                 }
             }
+
+            public static ID? DeserializeNullableUnsafe(ref JsonReader reader)
+            {
+                return (reader.GetCurrentJsonToken()) switch
+                {
+                JsonToken.Number => new ID(reader.ReadInt64()),
+                JsonToken.String => new ID(EscapedUTF8String.Formatter.DeserializeUnsafe(ref reader)), // new ID(formatterResolver.GetFormatter<EscapedUTF8String.Formatter>().Deserialize(ref reader, formatterResolver)),
+                    JsonToken.Null => (ID?)null,
+                    _ => throw new JsonParsingException("Expected number or string or null"),
+                };
+            }
+
+            public static ID? DeserializeNullableSafe(ref JsonReader reader)
+            {
+                return (reader.GetCurrentJsonToken()) switch
+                {
+                    JsonToken.Number => new ID(reader.ReadInt64()),
+                    JsonToken.String => new ID(EscapedUTF8String.Formatter.DeserializeSafe(ref reader)), // new ID(formatterResolver.GetFormatter<EscapedUTF8String.Formatter>().Deserialize(ref reader, formatterResolver)),
+                    JsonToken.Null => (ID?)null,
+                    _ => throw new JsonParsingException("Expected number or string or null"),
+                };
+            }
+
             public sealed class Nullable : IJsonFormatter<ID?>
             {
 
                 public ID? Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
                 {
-                    return (reader.GetCurrentJsonToken()) switch
-                    {
-                        JsonToken.Number => new ID(reader.ReadInt64()),
-                        JsonToken.String => new ID(formatterResolver.GetFormatter<EscapedUTF8String>().Deserialize(ref reader, formatterResolver)),
-                        JsonToken.Null => (ID?)null,
-                        _ => throw new JsonParsingException("Expected number or string or null"),
-                    };
+                    return DeserializeNullableSafe(ref reader);
                 }
+
+                
 
                 public void Serialize(ref JsonWriter writer, ID? value, IJsonFormatterResolver formatterResolver)
                 {

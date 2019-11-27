@@ -1,4 +1,7 @@
-﻿using System.Runtime.Serialization;
+﻿using RamType0.JsonRpc.Server;
+using System;
+using System.Runtime.Serialization;
+using System.Threading.Tasks.Sources;
 using Utf8Json;
 
 namespace RamType0.JsonRpc.Client
@@ -11,7 +14,7 @@ namespace RamType0.JsonRpc.Client
         public JsonRpcVersion Version => default;
         [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp.Nullable))]
         [DataMember(Name = "method")]
-        public EscapedUTF8String Method { get; set; }
+        public string Method { get; set; }
         [DataMember(Name = "params")]
         public T Params { get; set; }
         [DataMember(Name = "id")]
@@ -26,7 +29,7 @@ namespace RamType0.JsonRpc.Client
         public JsonRpcVersion Version => default;
         [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp.Nullable))]
         [DataMember(Name = "method")]
-        public EscapedUTF8String Method { get; set; }
+        public string Method { get; set; }
         [DataMember(Name = "params")]
         public T Params { get; set; }
     }
@@ -44,6 +47,12 @@ namespace RamType0.JsonRpc.Client
         [DataMember(Name = "id")]
         [JsonFormatter(typeof(ID.Formatter.Nullable))]
         public ID? ID { get; set; }
+        //[DataMember(Name = "error")]
+        //public ResponseError<object?>? Error { get; set; }
+    }
+
+    public struct ErrorResponseMessage
+    {
         [DataMember(Name = "error")]
         public ResponseError<object?>? Error { get; set; }
     }
@@ -59,6 +68,38 @@ namespace RamType0.JsonRpc.Client
         public ResponseError<object?>? Error { get; set; }
     }
 
+
+
+    public sealed class DefaultResponseErrorHandler : IResponseErrorHandler
+    {
+        public static Exception? FromPreDefinedError<T>(ResponseError<T> error)
+        {
+            string message = error.Message;
+
+            switch ((ErrorCode)error.Code)
+            {
+                case ErrorCode.ParseError:
+                case ErrorCode.InvalidRequest:
+                    return new RequestParsingException<T>(error);
+                case ErrorCode.MethodNotFound:
+                    return new MissingMethodException(message);
+                case ErrorCode.InvalidParams:
+                    return new ArgumentException(message);
+                case ErrorCode.InternalError:
+                    return new ServerInternalErrorException<T>(error);
+                case ErrorCode.ServerNotInitialized:
+                    return new ServerNotInitializedException<T>(error);
+                default:
+                    return null;
+            }
+            
+        }
+
+        public Exception AsException<T>(ResponseError<T> error)
+        {
+            return FromPreDefinedError(error)?? new ResponseErrorException<T>(error);
+        }
+    }
     public struct ResponseError<T>
     {
         [DataMember(Name = "code")]
@@ -70,4 +111,56 @@ namespace RamType0.JsonRpc.Client
 
     }
 
+        [System.Serializable]
+    public class ResponseErrorException<T> : System.IO.IOException
+    {
+        public ResponseError<T> Error { get; }
+        public ResponseErrorException(ResponseError<T> error) :base(error.Message)
+        {
+            Error = error;
+        }
+        
+    }
+
+        public class RequestParsingException<T> : ResponseErrorException<T>
+        {
+            public RequestParsingException(ResponseError<T> error) : base(error)
+            {
+            }
+        }
+
+
+
+        [Serializable]
+        public class ServerInternalErrorException<T> : ResponseErrorException<T>
+        {
+            public ServerInternalErrorException(ResponseError<T> error) : base(error)
+            {
+            }
+        }
+
+
+    [Serializable]
+    public class ServerNotInitializedException<T> : InvalidOperationException
+    {
+        public ResponseError<T> Error { get; }
+        public ServerNotInitializedException(ResponseError<T> error):base(error.Message)
+        {
+            Error = error;
+        }
+        
+    }
+
+        [System.Serializable]
+    public class RequestCancelledException<T> : System.OperationCanceledException
+    {
+        public ResponseError<T> Error { get; }
+        public RequestCancelledException(ResponseError<T> error) : base(error.Message) 
+        {
+            Error = error;
+        }
+
+    }
+
+    
 }

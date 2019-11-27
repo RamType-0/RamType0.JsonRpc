@@ -116,6 +116,9 @@ namespace RamType0.JsonRpc
                 return newFactory;//.CreateNew(d);
             }
         }
+
+
+
         static ConcurrentDictionary<MethodInfo, RpcEntryFactory> GeneratedFuncActionFactories { get; } = new ConcurrentDictionary<MethodInfo, RpcEntryFactory>();
         static HashSet<Type> GenericFuncActionTypes { get; } = new HashSet<Type>()
         {
