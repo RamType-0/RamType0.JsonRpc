@@ -238,7 +238,7 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 1_000_000; i++)
             {
-                receiver.Resolve(bytes);
+                receiver.ResolveAsync(bytes);
             }
             //Task.WaitAll(tasks);
         }
@@ -259,7 +259,7 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 1_000_000; i++)
             {
-                receiver.Resolve(bytes);
+                receiver.ResolveAsync(bytes);
             }
             //Task.WaitAll(tasks);
         }

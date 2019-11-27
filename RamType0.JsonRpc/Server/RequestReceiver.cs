@@ -35,10 +35,6 @@ namespace RamType0.JsonRpc.Server
         {
             return RequestObjectResolver.ResolveAsync(RpcMethodDictionary, Output, segment, JsonFormatterResolver);
         }
-        public void Resolve(ArraySegment<byte> segment)
-        {
-            ResolveAsync(segment).GetAwaiter().GetResult(); 
-        }
         ///// <summary>
         ///// 次のJsonRpcリクエストが既にStreamに乗っていた場合、ParseErrorがInvalidRequestとして報告される場合があります。(厳密に区別しようがない)
         ///// </summary>
