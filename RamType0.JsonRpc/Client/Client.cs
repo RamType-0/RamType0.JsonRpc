@@ -84,6 +84,14 @@ namespace RamType0.JsonRpc.Client
         public IRequestObjectOutput Output { get; }
         public IResponseErrorHandler ErrorHandler { get; }
         long idSource = 0;
+
+        public Client(IJsonFormatterResolver jsonResolver, IRequestObjectOutput output, IResponseErrorHandler errorHandler)
+        {
+            JsonResolver = jsonResolver;
+            Output = output;
+            ErrorHandler = errorHandler;
+        }
+
         internal ID GetUniqueID()
         {
             return new ID(Interlocked.Increment(ref idSource));//1秒に40億件処理してもマイナス値になるまで60年以上かかるので問題ないはず・・・

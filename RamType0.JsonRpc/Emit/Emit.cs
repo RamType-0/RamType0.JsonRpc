@@ -84,7 +84,7 @@ namespace RamType0.JsonRpc
             ReadOnlySpan<FieldInfo> arguments = new ReadOnlySpan<FieldInfo>(args.Array!, args.Offset, args.Count);
             var invokerType = RpcDelegateInvokerBuilder.Create<T>(paramsType, arguments);
             Type responseCreaterType;
-            bool isCancellable = typeof(ICancellableMethodParams).IsAssignableFrom(paramsType);
+            bool isCancellable = typeof(IMethodParamsInjectID).IsAssignableFrom(paramsType);
             var returnType = method.ReturnType;
             if (returnType==typeof(void))
             {
@@ -92,7 +92,7 @@ namespace RamType0.JsonRpc
                 typeArray3[0] = typeof(T);
                 typeArray3[1] = paramsType;
                 typeArray3[2] = invokerType;
-                var genericType = isCancellable ? typeof(DefaultCancellableActionProxy<,,>) : typeof(DefaultActionProxy<,,>);
+                var genericType = isCancellable ? typeof(DefaultIDInjectedActionProxy<,,>) : typeof(DefaultActionProxy<,,>);
                 responseCreaterType = genericType.MakeGenericType(typeArray3);
             }
             else
@@ -102,7 +102,7 @@ namespace RamType0.JsonRpc
                 funcProxyGenericArgs[1] = paramsType;
                 funcProxyGenericArgs[2] = returnType;
                 funcProxyGenericArgs[3] = invokerType;
-                var genericType = isCancellable ? typeof(DefaultCancellableFunctionProxy<,,,>) : typeof(DefaultFunctionProxy<,,,>);
+                var genericType = isCancellable ? typeof(DefaultIDInjectedFunctionProxy<,,,>) : typeof(DefaultFunctionProxy<,,,>);
                 responseCreaterType = genericType.MakeGenericType(funcProxyGenericArgs);
             }
             var entryFactoryArgs = TypeArray4;

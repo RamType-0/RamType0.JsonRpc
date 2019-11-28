@@ -77,6 +77,25 @@ namespace RamType0.JsonRpc
                 };
             }
 
+            public static ID DeserializeSafe(ref JsonReader reader)
+            {
+                return (reader.GetCurrentJsonToken()) switch
+                {
+                    JsonToken.Number => new ID(reader.ReadInt64()),
+                    JsonToken.String => new ID(EscapedUTF8String.Formatter.DeserializeSafe(ref reader)),
+                    _ => throw new JsonParsingException("Expected number or string"),
+                };
+            }
+            public static ID DeserializeUnsafe(ref JsonReader reader)
+            {
+                return (reader.GetCurrentJsonToken()) switch
+                {
+                    JsonToken.Number => new ID(reader.ReadInt64()),
+                    JsonToken.String => new ID(EscapedUTF8String.Formatter.DeserializeUnsafe(ref reader)),
+                    _ => throw new JsonParsingException("Expected number or string"),
+                };
+            }
+
             public void Serialize(ref JsonWriter writer, ID value, IJsonFormatterResolver formatterResolver)
             {
                 Serialize(ref writer, value);

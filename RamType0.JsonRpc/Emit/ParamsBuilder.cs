@@ -39,9 +39,9 @@ namespace RamType0.JsonRpc
                     {
                         ParameterInfo parameter = parameters[i];
                         var field = fields[i] = builder.DefineField(parameter.Name!, parameter.ParameterType, FieldAttributes.Public);
-                        if (parameter.GetCustomAttribute(typeof(IDCancellationAttribute)) != null)
+                        if (parameter.GetCustomAttribute(typeof(RpcIDAttribute)) != null)
                         {
-                            if (parameter.ParameterType == typeof(CancellationToken))
+                            if (parameter.ParameterType == typeof(ID?))
                             {
 
                                 if (parameters.Length == 1)
@@ -49,8 +49,8 @@ namespace RamType0.JsonRpc
                                     builder.AddInterfaceImplementation(typeof(IEmptyParams));
                                 }
                                 field.SetCustomAttribute(idCancellationTokenAttributeBuilder);
-                                builder.AddInterfaceImplementation(typeof(ICancellableMethodParams));
-                                var property = builder.DefineProperty("CancellationToken", PropertyAttributes.HasDefault, typeof(CancellationToken), Type.EmptyTypes);
+                                builder.AddInterfaceImplementation(typeof(IMethodParamsInjectID));
+                                var property = builder.DefineProperty("ID", PropertyAttributes.HasDefault, typeof(ID?), Type.EmptyTypes);
                                 property.SetGetMethod(DefineCancellationTokenGetter(builder, field));
                                 property.SetSetMethod(DefineCancellationTokenSetter(builder, field));
                                 cancellByIDIndex = i;
@@ -78,11 +78,11 @@ namespace RamType0.JsonRpc
                 
 
             
-            readonly static CustomAttributeBuilder idCancellationTokenAttributeBuilder = new CustomAttributeBuilder(typeof(IDCancellationAttribute).GetConstructor(Type.EmptyTypes)!, Array.Empty<object>());
+            readonly static CustomAttributeBuilder idCancellationTokenAttributeBuilder = new CustomAttributeBuilder(typeof(RpcIDAttribute).GetConstructor(Type.EmptyTypes)!, Array.Empty<object>());
             private static MethodBuilder DefineCancellationTokenGetter(TypeBuilder type, FieldInfo field)
             {
-                var getter = type.DefineMethod("get_CancellationToken", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(CancellationToken), Type.EmptyTypes);
-                type.DefineMethodOverride(getter, typeof(ICancellableMethodParams).GetMethod("get_CancellationToken")!);
+                var getter = type.DefineMethod("get_ID", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(ID?), Type.EmptyTypes);
+                type.DefineMethodOverride(getter, typeof(IMethodParamsInjectID).GetMethod("get_ID")!);
                 var il = getter.GetILGenerator();
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldfld, field);
@@ -92,8 +92,10 @@ namespace RamType0.JsonRpc
 
             private static MethodBuilder DefineCancellationTokenSetter(TypeBuilder type, FieldInfo field)
             {
-                var setter = type.DefineMethod("set_CancellationToken", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(void), new[] { typeof(CancellationToken) });
-                type.DefineMethodOverride(setter, typeof(ICancellableMethodParams).GetMethod("set_CancellationToken")!);
+                var typeArray1 = TypeArray1;
+                typeArray1[0] = typeof(ID?);
+                var setter = type.DefineMethod("set_ID", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(void), typeArray1);
+                type.DefineMethodOverride(setter, typeof(IMethodParamsInjectID).GetMethod("set_ID")!);
                 var il = setter.GetILGenerator();
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldarg_1);

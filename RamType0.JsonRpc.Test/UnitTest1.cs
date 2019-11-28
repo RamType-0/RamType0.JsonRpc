@@ -32,18 +32,17 @@ namespace RamType0.JsonRpc.Test
         public void RpcDicTest()
         {
 
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
             dic.Register("log", RpcEntry.FromDelegate<Action<string>>((str) => Debug.WriteLine(str)));
             dic.Register("none", RpcEntry.FromDelegate<Action>( () => { }));
-            RequestReceiver receiver = CreateReceiver(dic);
-            receiver.Resolve(
+            dic.ResolveAsync(
                 "{\"jsonrpc\":\"2.0\"," +
                 "\"params\":{\"str\":\"Hello\"}," +
                 "\"method\":\"log\"," +
                 "\"id\":\"asd\"" +
                 "}"
                 );
-            receiver.Resolve(
+            dic.ResolveAsync(
                 "{\"jsonrpc\":\"2.0\"," +
                 "\"params\":{\"str\":\"World!\"}," +
                 "\"method\":\"none\"," +
@@ -52,13 +51,13 @@ namespace RamType0.JsonRpc.Test
                 );
         }
 
-        private static RequestReceiver CreateReceiver(JsonRpcMethodDictionary dic)
+        private static JsonRpcServer CreateServer()
 
         {
             
-            var responser = new DummyResponseOutput();
-            var receiver = new RequestReceiver(dic, responser, JsonSerializer.DefaultResolver);
-            return receiver;
+            var output = new DummyResponseOutput();
+            var server = new JsonRpcServer(output, JsonSerializer.DefaultResolver);
+            return server;
         }
 
         class DummyResponseOutput : IResponseOutput
@@ -72,11 +71,9 @@ namespace RamType0.JsonRpc.Test
         [Test]
         public void RpcDic10MReq()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
             dic.Register("log1",RpcEntry.FromDelegate<Func<string,string>>((str) => { return str; }));
-            //var tasks = new Task[10000000];
-            var receiver = CreateReceiver(dic);
             var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
                 "\"params\":[\"10MegaShock!!!\"]," +
@@ -85,7 +82,7 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 10_000_000; i++)
             {
-                receiver.ResolveAsync(bytes);
+                dic.ResolveAsync(bytes);
             }
             //Task.WaitAll(tasks);
             
@@ -95,10 +92,9 @@ namespace RamType0.JsonRpc.Test
         [Test]
         public void RpcDic10MNotification()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
             dic.Register("log2",RpcEntry.FromDelegate<Func<string, string>>((str) => {  return str; }));
-            var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
@@ -107,7 +103,7 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 10_000_000; i++)
             {
-                receiver.ResolveAsync(bytes );
+                dic.ResolveAsync(bytes );
             }
             //Task.WaitAll(tasks);
         }
@@ -117,11 +113,10 @@ namespace RamType0.JsonRpc.Test
         [Test]
         public void RpcDic1MInvalidJson()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
             dic.Register("log3",RpcEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
 
-            var receiver = CreateReceiver(dic);
             var bytes = Encoding.UTF8.GetBytes(
                 //"{\"jsonrpc\":\"2.0\"," +
                 "\"params\":[\"1MegaShock!!!\"]," +
@@ -129,18 +124,17 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 1000000; i++)
             {
-                receiver.ResolveAsync(bytes);
+                dic.ResolveAsync(bytes);
             }
         }
 
         [Test]
         public void RpcDic1MMissingJsonRpc()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
             dic.Register("log4", RpcEntry.FromDelegate<Func<string, string>>( (str) => { return str; }));
 
-            var receiver = CreateReceiver(dic);
             var bytes = Encoding.UTF8.GetBytes(
                 "{"+
                 //"\"jsonrpc\":\"2.0\"," +
@@ -149,7 +143,7 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 1000000; i++)
             {
-                receiver.ResolveAsync(bytes);
+                dic.ResolveAsync(bytes);
             }
 
         }
@@ -157,12 +151,10 @@ namespace RamType0.JsonRpc.Test
         [Test]
         public void RpcDic1MInvalidJsonRpc()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
             dic.Register("log5", RpcEntry.FromDelegate<Func<string, string>>( (str) => { return str; }));
 
-            var receiver = CreateReceiver(dic);
-    
             var bytes = Encoding.UTF8.GetBytes(
                 "{" +
                 "\"jsonrpc\":\"1.0\"," +
@@ -171,18 +163,16 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 1000000; i++)
             {
-                receiver.ResolveAsync(bytes);
+                dic.ResolveAsync(bytes);
             }
 
         }
         [Test]
         public void RpcDic10MLongNotification()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
             dic.Register("log6", RpcEntry.FromDelegate<Func<string, string>>( (str) => { return str; }));
-
-            var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
@@ -191,45 +181,42 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 10_000_000; i++)
             {
-                receiver.ResolveAsync(bytes);
+                dic.ResolveAsync(bytes);
             }
             //Task.WaitAll(tasks);
         }
 
-        public void CancellableFunc(CancellationToken token)
+        public ID? IDInject(ID? id)
         {
-            return;
+            return id;
         }
-        public delegate void TestCancellable([IDCancellation]CancellationToken token);
+        public delegate ID? TestInjectID([RpcID]ID? id);
         [Test]
-        public void RpcDic10MCancellableReq()
+        public void RpcDic10MIDInjectReq()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
-            dic.Register("cancellable", RpcEntry.FromDelegate<TestCancellable>(CancellableFunc));
-            //var tasks = new Task[10000000];
-            var receiver = CreateReceiver(dic);
+            dic.Register("idInject", RpcEntry.FromDelegate<TestInjectID>(IDInject));
             
             for (int i = 0; i < 10_000_000; i++)
             {
                 var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
                 //"\"params\":[\"10MegaShock!!!\"]," +
-                "\"method\":\"cancellable\"," +
+                "\"method\":\"idInject\"," +
                 $"\"id\":{i.ToString()}" +
                 "}");
-                receiver.ResolveAsync(bytes);
+                dic.ResolveAsync(bytes);
             }
             //Task.WaitAll(tasks);
 
         }
         public void RpcDic1MSingleThreadNotification()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
             dic.Register("sT", RpcEntry.FromDelegate<Func<string, string>>( (str) => { return str; }));
 
-            var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
@@ -238,7 +225,7 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 1_000_000; i++)
             {
-                receiver.ResolveAsync(bytes);
+                dic.ResolveAsync(bytes);
             }
             //Task.WaitAll(tasks);
         }
@@ -246,11 +233,10 @@ namespace RamType0.JsonRpc.Test
 
         public void RpcDic1MSingleThreadUnmanagedParams()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
             dic.Register("mul2", RpcEntry.FromDelegate<Func<long,long>>( (number) => { return number * 2; }));
 
-            var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
@@ -259,7 +245,7 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 1_000_000; i++)
             {
-                receiver.ResolveAsync(bytes);
+                dic.ResolveAsync(bytes);
             }
             //Task.WaitAll(tasks);
         }
@@ -268,11 +254,10 @@ namespace RamType0.JsonRpc.Test
 
         public void RpcDic10MUnmanagedParams()
         {
-            var dic = new JsonRpcMethodDictionary();
+            var dic = CreateServer();
 
             dic.Register("mul3", RpcEntry.FromDelegate<Func<long, long>>((number) => { return number * 3; }));
 
-            var receiver = CreateReceiver(dic);
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
@@ -281,7 +266,7 @@ namespace RamType0.JsonRpc.Test
                 "}");
             for (int i = 0; i < 10_000_000; i++)
             {
-                receiver.ResolveAsync(bytes);
+                dic.ResolveAsync(bytes);
             }
             //Task.WaitAll(tasks);
         }

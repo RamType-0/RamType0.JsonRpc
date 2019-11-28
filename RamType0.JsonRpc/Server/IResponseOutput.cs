@@ -66,7 +66,7 @@ namespace RamType0.JsonRpc.Server
         /// <typeparam name="TResponse"></typeparam>
         /// <typeparam name="TError"></typeparam>
         /// <param name="response"></param>
-        protected internal ValueTask ResponseError<TResponse>(TResponse response) where TResponse :notnull, IErrorResponse
+        public ValueTask ResponseError<TResponse>(TResponse response) where TResponse :notnull, IErrorResponse
         {
             return Response(response);
         }
@@ -76,9 +76,9 @@ namespace RamType0.JsonRpc.Server
         /// <typeparam name="TResponse"></typeparam>
         /// <typeparam name="TError"></typeparam>
         /// <param name="response"></param>
-        public ValueTask ResponseException<T>(T response)where T:IErrorResponse<Exception>
+        public ValueTask ResponseException<T>(T response)where T:notnull,IErrorResponse<Exception>
         {
-            return Response(response);
+            return ResponseError(response);
         }
     }
    

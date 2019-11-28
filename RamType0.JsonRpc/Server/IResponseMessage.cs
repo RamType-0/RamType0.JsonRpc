@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.Serialization;
+using System.Text;
 using Utf8Json;
 
 namespace RamType0.JsonRpc.Server
@@ -184,6 +185,11 @@ namespace RamType0.JsonRpc.Server
         {
             return new ErrorResponse<Exception>(null, ErrorObject.Exception(ErrorCode.ParseError, e));
         }
+
+        public static ErrorResponse ParseError(ArraySegment<byte> json)
+        {
+            return new ErrorResponse(null, new ErrorObject(ErrorCode.ParseError, Encoding.UTF8.GetString(json)));
+        }
         public static ErrorResponse MethodNotFound(ID requestID, string methodName)
         {
             return new ErrorResponse(requestID, new ErrorObject(ErrorCode.MethodNotFound, $"The method you wanted to invoke not found. Assigned name:{methodName}"));
@@ -193,9 +199,15 @@ namespace RamType0.JsonRpc.Server
             return new ErrorResponse(requestID, new ErrorObject(ErrorCode.InvalidParams, $"The params of request object was invalid. Assigned params:{paramsJson}"));
         }
 
+        
         public static ErrorResponse InvalidRequest(string requestJson)
         {
             return new ErrorResponse(null, new ErrorObject(ErrorCode.InvalidRequest, $"The request object was invalid. Assigned request:{requestJson}"));
+        }
+
+        public static ErrorResponse InvalidRequest(ArraySegment<byte> json)
+        {
+            return InvalidRequest(Encoding.UTF8.GetString(json));
         }
 
     }
