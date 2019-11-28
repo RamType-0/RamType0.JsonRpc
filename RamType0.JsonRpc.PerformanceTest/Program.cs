@@ -1,5 +1,4 @@
-﻿using System;
-using RamType0.JsonRpc.Test;
+﻿using RamType0.JsonRpc.Test;
 namespace RamType0.JsonRpc.PerformanceTest
 {
     class Program

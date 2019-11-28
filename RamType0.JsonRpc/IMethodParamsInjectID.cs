@@ -1,6 +1,4 @@
-﻿using System.Threading;
-
-namespace RamType0.JsonRpc
+﻿namespace RamType0.JsonRpc
 {
     public interface IMethodParamsInjectID : IMethodParams
     {

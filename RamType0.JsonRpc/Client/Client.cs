@@ -16,19 +16,19 @@ namespace RamType0.JsonRpc.Client
             ResponseError<object?>? _error = null;
             ArraySegment<byte> resultSegment = default;
 
-            while (true) 
+            while (true)
             {
 
                 var nameSegment = reader.ReadPropertyNameSegmentRaw().AsSpan();
-                if(nameSegment.SequenceEqual(stackalloc byte[] {(byte)'i',(byte)'d' }))
+                if (nameSegment.SequenceEqual(stackalloc byte[] { (byte)'i', (byte)'d' }))
                 {
                     _id = ID.Formatter.DeserializeNullableUnsafe(ref reader);
                 }
-                else if(nameSegment.SequenceEqual(stackalloc byte[] {(byte)'r',(byte)'e',(byte)'s',(byte)'u',(byte)'l',(byte)'t', }))
+                else if (nameSegment.SequenceEqual(stackalloc byte[] { (byte)'r', (byte)'e', (byte)'s', (byte)'u', (byte)'l', (byte)'t', }))
                 {
                     resultSegment = reader.ReadNextBlockSegment();
                 }
-                else if (nameSegment.SequenceEqual(stackalloc byte[] {(byte)'e', (byte)'r', (byte)'r', (byte)'o', (byte)'r', }))
+                else if (nameSegment.SequenceEqual(stackalloc byte[] { (byte)'e', (byte)'r', (byte)'r', (byte)'o', (byte)'r', }))
                 {
                     _error = JsonResolver.GetFormatterWithVerify<ResponseError<object?>>().Deserialize(ref reader, JsonResolver);
                 }
@@ -81,16 +81,18 @@ namespace RamType0.JsonRpc.Client
         internal ConcurrentDictionary<ID, RequestCompletionSource> UnResponsedRequests { get; } = new ConcurrentDictionary<ID, RequestCompletionSource>();
         public ConcurrentBag<ResponseError<object?>> UnIdentifiableErrors { get; } = new ConcurrentBag<ResponseError<object?>>();
         public IJsonFormatterResolver JsonResolver { get; }
-        public IRequestObjectOutput Output { get; }
+        public IRequestOutput Output { get; }
         public IResponseErrorHandler ErrorHandler { get; }
         long idSource = 0;
 
-        public Client(IJsonFormatterResolver jsonResolver, IRequestObjectOutput output, IResponseErrorHandler errorHandler)
+        public Client(IRequestOutput output, IJsonFormatterResolver jsonResolver,  IResponseErrorHandler errorHandler)
         {
             JsonResolver = jsonResolver;
             Output = output;
             ErrorHandler = errorHandler;
         }
+
+        public Client(IRequestOutput output, IJsonFormatterResolver jsonResolver):this(output,jsonResolver,DefaultResponseErrorHandler.Instance) { }
 
         internal ID GetUniqueID()
         {
@@ -102,13 +104,13 @@ namespace RamType0.JsonRpc.Client
     {
         public Client Client { get; }
         public string MethodName { get; }
-        public RequestObjectSource(Client client,string name)
+        public RequestObjectSource(Client client, string name)
         {
             Client = client;
             MethodName = name;
         }
-        protected async ValueTask<TResult> RequestAsync<TParams,TResult>(TParams parameters)
-            where TParams :IMethodParams
+        protected async ValueTask<TResult> RequestAsync<TParams, TResult>(TParams parameters)
+            where TParams : IMethodParams
 
         {
             var request = new Request<TParams>() { ID = Client.GetUniqueID(), Method = MethodName, Params = parameters };
@@ -129,7 +131,7 @@ namespace RamType0.JsonRpc.Client
             await completion.VoidValueTask.ConfigureAwait(false);
 
         }
-        protected TResult Request<TParams,TResult>(TParams parameters)
+        protected TResult Request<TParams, TResult>(TParams parameters)
             where TParams : IMethodParams
         {
             return RequestAsync<TParams, TResult>(parameters).Result;

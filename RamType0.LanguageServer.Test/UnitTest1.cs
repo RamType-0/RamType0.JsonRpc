@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using RamType0.LanguageServer;
 using System.Threading.Tasks;
 
 namespace RamType0.LanguageServer.Test

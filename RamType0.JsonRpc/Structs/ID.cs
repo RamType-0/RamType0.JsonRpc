@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Text;
 using Utf8Json;
 
 namespace RamType0.JsonRpc
@@ -13,7 +11,7 @@ namespace RamType0.JsonRpc
         public EscapedUTF8String? String { get; }
         public long? Number => !String.HasValue ? numberValue : (long?)null;
         public object Value => String ?? (object)numberValue;
-        
+
         public ID(EscapedUTF8String id)
         {
             String = id;
@@ -103,8 +101,8 @@ namespace RamType0.JsonRpc
 
             public static void Serialize(ref JsonWriter writer, ID value)
             {
-                
-                if(value.String is EscapedUTF8String str)
+
+                if (value.String is EscapedUTF8String str)
                 {
                     writer.WriteString(str);
                 }
@@ -118,8 +116,8 @@ namespace RamType0.JsonRpc
             {
                 return (reader.GetCurrentJsonToken()) switch
                 {
-                JsonToken.Number => new ID(reader.ReadInt64()),
-                JsonToken.String => new ID(EscapedUTF8String.Formatter.DeserializeUnsafe(ref reader)), // new ID(formatterResolver.GetFormatter<EscapedUTF8String.Formatter>().Deserialize(ref reader, formatterResolver)),
+                    JsonToken.Number => new ID(reader.ReadInt64()),
+                    JsonToken.String => new ID(EscapedUTF8String.Formatter.DeserializeUnsafe(ref reader)), // new ID(formatterResolver.GetFormatter<EscapedUTF8String.Formatter>().Deserialize(ref reader, formatterResolver)),
                     JsonToken.Null => (ID?)null,
                     _ => throw new JsonParsingException("Expected number or string or null"),
                 };
@@ -144,7 +142,7 @@ namespace RamType0.JsonRpc
                     return DeserializeNullableSafe(ref reader);
                 }
 
-                
+
 
                 public void Serialize(ref JsonWriter writer, ID? value, IJsonFormatterResolver formatterResolver)
                 {
@@ -160,7 +158,7 @@ namespace RamType0.JsonRpc
             }
         }
 
-       
+
     }
-    
+
 }

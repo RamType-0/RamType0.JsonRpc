@@ -58,5 +58,5 @@ namespace RamType0.JsonRpc.Server
 
 
     }
-    
+
 }

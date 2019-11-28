@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Utf8Json;
@@ -114,13 +113,13 @@ namespace RamType0.JsonRpc
                     byte escapeChar = default;
                     switch (item)
                     {
-                        case (byte)'\"': escapeChar = (byte)'\"';goto Escape;
-                        case (byte)'\\': escapeChar = (byte)'\\';goto Escape;
-                        case (byte)'\b': escapeChar = (byte)'b';goto Escape;
-                        case (byte)'\f': escapeChar = (byte)'f';goto Escape;
-                        case (byte)'\n': escapeChar = (byte)'n';goto Escape;
-                        case (byte)'\r': escapeChar = (byte)'r';goto Escape;
-                        case (byte)'\t': escapeChar = (byte)'t';goto Escape;
+                        case (byte)'\"': escapeChar = (byte)'\"'; goto Escape;
+                        case (byte)'\\': escapeChar = (byte)'\\'; goto Escape;
+                        case (byte)'\b': escapeChar = (byte)'b'; goto Escape;
+                        case (byte)'\f': escapeChar = (byte)'f'; goto Escape;
+                        case (byte)'\n': escapeChar = (byte)'n'; goto Escape;
+                        case (byte)'\r': escapeChar = (byte)'r'; goto Escape;
+                        case (byte)'\t': escapeChar = (byte)'t'; goto Escape;
                         case 0:
                         case 1:
                         case 2:

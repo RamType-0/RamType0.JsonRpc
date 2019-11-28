@@ -1,34 +1,36 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Utf8Json;
-using System.Threading.Tasks;
-using System.Threading;
-using Microsoft.Extensions.ObjectPool;
-using System.Collections.Concurrent;
 using System.Buffers;
+using System.Collections.Concurrent;
+using System.Text;
+using System.Threading.Tasks;
+using Utf8Json;
 
 namespace RamType0.JsonRpc.Server
 {
-    public class JsonRpcServer
+    public class Server
     {
-        public JsonRpcServer(IResponseOutput output, IJsonFormatterResolver jsonResolver,IRpcExceptionHandler exceptionHandler)
+        internal ConcurrentDictionary<EscapedUTF8String, RpcEntry> RpcMethods { get; set; } = new ConcurrentDictionary<EscapedUTF8String, RpcEntry>();
+        public IResponseOutput Output { get; }
+
+        public IJsonFormatterResolver JsonResolver { get; }
+
+        public IRpcExceptionHandler ExceptionHandler { get; }
+        public Server(IResponseOutput output, IJsonFormatterResolver jsonResolver, IRpcExceptionHandler exceptionHandler)
         {
             Output = output;
             JsonResolver = jsonResolver;
             ExceptionHandler = exceptionHandler;
         }
 
-        public JsonRpcServer(IResponseOutput output, IJsonFormatterResolver jsonResolver) :this(output,jsonResolver,DefaultRpcExceptionHandler.Instance){ }
-        ConcurrentDictionary<EscapedUTF8String, RpcEntry> RpcMethods { get; set; } = new ConcurrentDictionary<EscapedUTF8String, RpcEntry>();
-        public void Register(string methodName,RpcEntry entry)
+        public Server(IResponseOutput output, IJsonFormatterResolver jsonResolver) : this(output, jsonResolver, DefaultRpcExceptionHandler.Instance) { }
+        public void Register(string methodName, RpcEntry entry)
         {
             RpcMethods.TryAdd(EscapedUTF8String.FromUnEscaped(methodName), entry);
         }
 
         public bool UnRegister(string methodName)
         {
-           return RpcMethods.TryRemove(EscapedUTF8String.FromUnEscaped(methodName),out _);
+            return RpcMethods.TryRemove(EscapedUTF8String.FromUnEscaped(methodName), out _);
         }
 
         //internal CancellationTokenSource GetCancellationTokenSource(ID id)
@@ -64,11 +66,7 @@ namespace RamType0.JsonRpc.Server
         //}
         //internal ConcurrentDictionary<ID, CancellationTokenSource> Cancellables { get; } = new ConcurrentDictionary<ID, CancellationTokenSource>();
 
-        public IResponseOutput Output { get; }
-
-        public IJsonFormatterResolver JsonResolver { get; }
-
-        public IRpcExceptionHandler ExceptionHandler { get; }
+        
         public ValueTask ResolveAsync(ArraySegment<byte> json)
         {
             var reader = new JsonReader(json.Array!, json.Offset);
@@ -116,6 +114,10 @@ namespace RamType0.JsonRpc.Server
                                     {
                                         paramsSegment = reader.ReadNextBlockSegment();
                                     }
+                                    else
+                                    {
+                                        reader.ReadNextBlock();
+                                    }
 
                                     if (reader.ReadIsEndObject())
                                     {
@@ -147,16 +149,18 @@ namespace RamType0.JsonRpc.Server
                         goto BuildRequesetFailed;
                     }
                 }
-                ReachedObjectTerminal:
-                if(versioned && methodName is EscapedUTF8String name)
+            ReachedObjectTerminal:
+                if (versioned && methodName is EscapedUTF8String name)
                 {
-                    if(RpcMethods.TryGetValue(name,out var entry))
+                    if (RpcMethods.TryGetValue(name, out var entry))
                     {
                         return entry.InvokeAsync(this, paramsSegment, id);
                     }
                     else
                     {
-                        return Output.ResponseError(ErrorResponse.InvalidRequest(json));
+                        if (id is ID reqID)
+                            return Output.ResponseError(this,ErrorResponse.MethodNotFound(reqID, name.ToString()));
+                        else return new ValueTask();
                     }
                 }
                 else
@@ -180,18 +184,17 @@ namespace RamType0.JsonRpc.Server
                     var jsonTerminal = json.Offset + json.Count;
                     if (readerOffset >= jsonTerminal)
                     {
-                        return Output.ResponseError(ErrorResponse.InvalidRequest(json));
+                        return Output.ResponseError(this,ErrorResponse.InvalidRequest(json));
                     }
                 }
                 catch (JsonParsingException)
                 {
 
                 }
-                return Output.ResponseError(ErrorResponse.ParseError(json));
+                return Output.ResponseError(this,ErrorResponse.ParseError(json));
             }
 
         }
-
         public ValueTask ResolveAsync(string json)
         {
             var buffer = ArrayPool<byte>.Shared.Rent(json.Length * 4);
@@ -199,7 +202,6 @@ namespace RamType0.JsonRpc.Server
             var ret = ResolveAsync(segment);
             ArrayPool<byte>.Shared.Return(segment.Array!);
             return ret;
-
         }
     }
     public abstract class RpcEntry
@@ -209,7 +211,7 @@ namespace RamType0.JsonRpc.Server
         {
             return Emit.FromDelegate(d).NewEntry(d);
         }
-        public abstract ValueTask InvokeAsync(JsonRpcServer server, ArraySegment<byte> parametersSegment, ID? id);
+        public abstract ValueTask InvokeAsync(Server server, ArraySegment<byte> parametersSegment, ID? id);
     }
     public sealed class RpcEntry<TProxy, TDelegate, TParams, TDeserializer> : RpcEntry
         where TProxy : notnull, IRpcMethodProxy<TDelegate, TParams>
@@ -236,7 +238,7 @@ namespace RamType0.JsonRpc.Server
 
         bool ParamsIsEmpty { get; }
         TParams DefaultParams { get; } = default!;
-        public override ValueTask InvokeAsync(JsonRpcServer server,ArraySegment<byte> parametersSegment,ID? id)
+        public override ValueTask InvokeAsync(Server server, ArraySegment<byte> parametersSegment, ID? id)
         {
 
             TParams parameters;
@@ -252,7 +254,7 @@ namespace RamType0.JsonRpc.Server
                 {
                     if (id is ID reqID)
                     {
-                        return server.Output.ResponseError(ErrorResponse.InvalidParams(reqID, Encoding.UTF8.GetString(parametersSegment)));
+                        return server.Output.ResponseError(server,ErrorResponse.InvalidParams(reqID, Encoding.UTF8.GetString(parametersSegment)));
                     }
                     else
                     {
@@ -271,7 +273,7 @@ namespace RamType0.JsonRpc.Server
                 {
                     if (id is ID reqID)
                     {
-                        return server.Output.ResponseError(ErrorResponse.InvalidParams(reqID, "<missing>"));
+                        return server.Output.ResponseError(server,ErrorResponse.InvalidParams(reqID, "<missing>"));
                     }
                     else
                     {
@@ -280,7 +282,7 @@ namespace RamType0.JsonRpc.Server
                 }
             }
 
-            return Proxy.DelegateResponse(server,RpcMethod, parameters, id);
+            return Proxy.DelegateResponse(server, RpcMethod, parameters, id);
 
         }
     }

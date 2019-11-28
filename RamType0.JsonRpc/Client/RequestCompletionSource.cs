@@ -6,9 +6,9 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc.Client
 {
-    public abstract class RequestCompletionSource 
+    public abstract class RequestCompletionSource
     {
-        public abstract void SetResult(ArraySegment<byte> resultSegment,IJsonFormatterResolver formatterResolver);
+        public abstract void SetResult(ArraySegment<byte> resultSegment, IJsonFormatterResolver formatterResolver);
         public abstract void SetException(Exception exception);
     }
 

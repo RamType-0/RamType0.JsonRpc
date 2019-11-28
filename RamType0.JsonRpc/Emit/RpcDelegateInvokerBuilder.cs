@@ -1,20 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using RamType0.JsonRpc.Server;
+using System;
 using System.Reflection;
-using System.Text;
 using System.Reflection.Emit;
-using RamType0.JsonRpc.Server;
 
 namespace RamType0.JsonRpc
 {
     public static partial class Emit
     {
 
-        
+
         static class RpcDelegateInvokerBuilder
         {
             public static Type Create<T>(Type paramsType, ReadOnlySpan<FieldInfo> argumentFields)
-                where T:Delegate
+                where T : Delegate
             {
                 VerifyTIsAccessible<T>();
 

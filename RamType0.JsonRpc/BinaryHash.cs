@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace RamType0.JsonRpc
 {
@@ -45,7 +43,7 @@ namespace RamType0.JsonRpc
         /// </summary>
         /// <param name="span"></param>
         /// <returns></returns>
-        public static int GetSequenceHashCode(this Span<byte> span) => GetSequenceHashCode((ReadOnlySpan<byte>)span); 
+        public static int GetSequenceHashCode(this Span<byte> span) => GetSequenceHashCode((ReadOnlySpan<byte>)span);
         private static T GetElementUnsafeAs<T>(ReadOnlySpan<byte> span, int index = 0)
             where T : unmanaged
         {

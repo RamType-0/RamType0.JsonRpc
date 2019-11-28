@@ -27,7 +27,7 @@ namespace RamType0.JsonRpc
 
         #endregion
         internal static RpcEntryFactory FromDelegate<T>(T d)
-            where T:Delegate
+            where T : Delegate
         {
             if (!IsFuncOrAction<T>())//FuncまたはActionでないときは、デリゲート自体の引数の名前、属性を元にRpcEntryFactoryを生成します。
             {
@@ -63,7 +63,7 @@ namespace RamType0.JsonRpc
         /// <typeparam name="T"></typeparam>
         /// <param name="method"></param>
         /// <returns></returns>
-        private static RpcEntryFactory<T> BuildFactory<T>(MethodInfo method) 
+        private static RpcEntryFactory<T> BuildFactory<T>(MethodInfo method)
             where T : Delegate
         {
             var (paramsType, args, deserializedFields) = ParamsBuilder.FromMethod(method);
@@ -86,7 +86,7 @@ namespace RamType0.JsonRpc
             Type responseCreaterType;
             bool isCancellable = typeof(IMethodParamsInjectID).IsAssignableFrom(paramsType);
             var returnType = method.ReturnType;
-            if (returnType==typeof(void))
+            if (returnType == typeof(void))
             {
 
                 typeArray3[0] = typeof(T);
@@ -112,7 +112,7 @@ namespace RamType0.JsonRpc
             entryFactoryArgs[3] = deserializerType;
             {
                 var newFactory = Unsafe.As<RpcEntryFactory<T>>(Activator.CreateInstance(typeof(RpcEntryFactory<,,,>).MakeGenericType(entryFactoryArgs)));
-                
+
                 return newFactory;//.CreateNew(d);
             }
         }
@@ -128,14 +128,14 @@ namespace RamType0.JsonRpc
             typeof(Action<,,,,,,,,,>) ,  typeof(Action<,,,,,,,,,,>) ,  typeof(Action<,,,,,,,,,,,>),
             typeof(Action<,,,,,,,,,,,,>) ,  typeof(Action<,,,,,,,,,,,,,>) ,  typeof(Action<,,,,,,,,,,,,,,>),
             typeof(Action<,,,,,,,,,,,,,,,>),
-             
+
             typeof(Func<>) ,  typeof(Func<,>) ,  typeof(Func<,,>),
             typeof(Func<,,,>) ,  typeof(Func<,,,,>) ,  typeof(Func<,,,,,>) ,
             typeof(Func<,,,,,,>) ,  typeof(Func<,,,,,,,>) ,  typeof(Func<,,,,,,,,>),
             typeof(Func<,,,,,,,,,>) ,  typeof(Func<,,,,,,,,,,>) ,  typeof(Func<,,,,,,,,,,,>),
             typeof(Func<,,,,,,,,,,,,>) ,  typeof(Func<,,,,,,,,,,,,,>) ,  typeof(Func<,,,,,,,,,,,,,,>),
             typeof(Func<,,,,,,,,,,,,,,,>),typeof(Func<,,,,,,,,,,,,,,,,>)
-        
+
         };
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool IsFuncOrAction<T>()
@@ -158,7 +158,7 @@ namespace RamType0.JsonRpc
             public abstract RpcEntry NewEntry(Delegate rpcMethod);
         }
         internal static class DelegateTypeBasedRpcEntryFactoryCache<T>
-            where T:Delegate
+            where T : Delegate
         {
             public static RpcEntryFactory<T> Instance { get; }
             static DelegateTypeBasedRpcEntryFactoryCache()//静的コンストラクタはJITコンパイラがスレッドセーフで1回しか呼ばれないことを保証するため最強の排他処理となる
@@ -176,9 +176,9 @@ namespace RamType0.JsonRpc
         {
             public override sealed RpcEntry NewEntry(Delegate rpcMethod)
             {
-                
-                return new RpcEntry<TProxy, TDelegate, TParams, TDeserializer>(default,(TDelegate)(rpcMethod),default);
-                
+
+                return new RpcEntry<TProxy, TDelegate, TParams, TDeserializer>(default, (TDelegate)(rpcMethod), default);
+
             }
         }
     }

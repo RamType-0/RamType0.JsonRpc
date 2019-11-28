@@ -3,8 +3,6 @@ using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-using System.Text;
 using Utf8Json;
 namespace RamType0.JsonRpc
 {
@@ -13,7 +11,7 @@ namespace RamType0.JsonRpc
     /// methodの名前の解決などに使います。
     /// </summary>
     [JsonFormatter(typeof(Formatter.Persistent))]
-    public readonly struct EscapedUTF8String : IEquatable<EscapedUTF8String>,IEnumerable<byte>
+    public readonly struct EscapedUTF8String : IEquatable<EscapedUTF8String>, IEnumerable<byte>
     {
         readonly ArraySegment<byte> bytes;
 
@@ -30,7 +28,7 @@ namespace RamType0.JsonRpc
         /// </summary>
         public static EscapedUTF8String FromEscapedQuoted(ArraySegment<byte> text)
         {
-            return new EscapedUTF8String(text.Slice(1,text.Count-2));
+            return new EscapedUTF8String(text.Slice(1, text.Count - 2));
             //return new EscapedUTF8String(text[1..^1]);//C#8のRange使ってみようと思ったけどArraySegment[Range]がコピー作らないかどうかがドキュメントに乗ってないので保留
 
         }
@@ -122,10 +120,10 @@ namespace RamType0.JsonRpc
         public override int GetHashCode()
         {
             return bytes.AsSpan().GetSequenceHashCode();
-            
+
         }
 
-        
+
         private EscapedUTF8String Clone()
         {
             var array = new byte[bytes.Count];
@@ -133,7 +131,7 @@ namespace RamType0.JsonRpc
 
             return EscapedUTF8String.FromEscapedNonQuoted(array);
         }
-        
+
 
         IEnumerator<byte> IEnumerable<byte>.GetEnumerator()
         {
@@ -215,7 +213,7 @@ namespace RamType0.JsonRpc
             public sealed class Temp : IJsonFormatter<EscapedUTF8String>
             {
 
-                
+
 
                 public EscapedUTF8String Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
                 {
@@ -226,7 +224,7 @@ namespace RamType0.JsonRpc
                 /// </summary>
                 /// <param name="reader"></param>
                 /// <returns></returns>
-                
+
 
                 public void Serialize(ref JsonWriter writer, EscapedUTF8String value, IJsonFormatterResolver formatterResolver)
                 {
@@ -234,7 +232,7 @@ namespace RamType0.JsonRpc
 
                 }
 
-                
+
                 public sealed class Nullable : IJsonFormatter<EscapedUTF8String?>
                 {
                     public EscapedUTF8String? Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
@@ -242,14 +240,14 @@ namespace RamType0.JsonRpc
                         return DeserializeNullableUnsafe(ref reader);
                     }
 
-                    
+
 
                     public void Serialize(ref JsonWriter writer, EscapedUTF8String? value, IJsonFormatterResolver formatterResolver)
                     {
                         SerializeNullable(ref writer, value);
                     }
 
-                    
+
                 }
             }
             public sealed class Persistent : IJsonFormatter<EscapedUTF8String>
@@ -277,7 +275,7 @@ namespace RamType0.JsonRpc
                 }
             }
         }
-        
+
         //[Obsolete]
         public static explicit operator EscapedUTF8String(string text)
         {
@@ -286,9 +284,9 @@ namespace RamType0.JsonRpc
     }
     public static class EscapedUTF8StringJsonWriterEx
     {
-        public static void WriteString(ref this JsonWriter writer,EscapedUTF8String str)
+        public static void WriteString(ref this JsonWriter writer, EscapedUTF8String str)
         {
-            writer.EnsureCapacity(str.Length+2);
+            writer.EnsureCapacity(str.Length + 2);
             writer.WriteRawUnsafe((byte)'\"');
             foreach (var b in str)
             {

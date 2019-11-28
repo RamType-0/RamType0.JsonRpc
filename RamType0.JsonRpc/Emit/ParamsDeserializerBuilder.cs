@@ -1,26 +1,23 @@
 ﻿using RamType0.JsonRpc.Server;
 using System;
-using System.Buffers;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
-using System.Text;
 using Utf8Json;
 
 namespace RamType0.JsonRpc
 {
     public static partial class Emit
     {
-        
+
         public static class ParamsDeserializerBuilder
         {
-            
+
 
             static MethodInfo ReadIsBeginArrayWithVerify { get; } = typeof(JsonReader).GetMethod("ReadIsBeginArrayWithVerify")!;
             static MethodInfo ReadIsEndArrayWithVerify { get; } = typeof(JsonReader).GetMethod("ReadIsEndArrayWithVerify")!;
             static MethodInfo ReadIsValueSeparatorWithVerify { get; } = typeof(JsonReader).GetMethod("ReadIsValueSeparatorWithVerify")!;
-            static MethodInfo ReadJson { get; } = typeof(ParamsDeserializerBuilder).GetMethod(nameof(ReadJsonImpl),BindingFlags.Public|BindingFlags.Static)!;
+            static MethodInfo ReadJson { get; } = typeof(ParamsDeserializerBuilder).GetMethod(nameof(ReadJsonImpl), BindingFlags.Public | BindingFlags.Static)!;
 
             static Type[] DeserializeParams { get; } = new Type[] { typeof(JsonReader).MakeByRefType(), typeof(IJsonFormatterResolver) };
 
@@ -48,7 +45,7 @@ namespace RamType0.JsonRpc
                     typeArray1[0] = paramsType;
                     Type interfaceType = typeof(IArrayStyleParamsDeserializer<>).MakeGenericType(typeArray1);
                     builder.AddInterfaceImplementation(interfaceType);
-                    var deserializeMethod = builder.DefineMethod("Deserialize", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final,paramsType,DeserializeParams);
+                    var deserializeMethod = builder.DefineMethod("Deserialize", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final, paramsType, DeserializeParams);
                     builder.DefineMethodOverride(deserializeMethod, typeof(IParamsDeserializer<>).MakeGenericType(typeArray1).GetMethod("Deserialize")!);
                     //T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
                     {

@@ -1,13 +1,11 @@
-﻿using RamType0.JsonRpc.Server;
-using System;
+﻿using System;
 using System.Runtime.Serialization;
-using System.Threading.Tasks.Sources;
 using Utf8Json;
 
 namespace RamType0.JsonRpc.Client
 {
     public struct Request<T>
-        where T:notnull,IMethodParams
+        where T : notnull, IMethodParams
     {
         [JsonFormatter(typeof(JsonRpcVersion.Formatter))]
         [DataMember(Name = "jsonrpc")]
@@ -72,6 +70,7 @@ namespace RamType0.JsonRpc.Client
 
     public sealed class DefaultResponseErrorHandler : IResponseErrorHandler
     {
+        public static DefaultResponseErrorHandler Instance { get; } = new DefaultResponseErrorHandler();
         public static Exception? FromPreDefinedError<T>(ResponseError<T> error)
         {
             string message = error.Message;
@@ -92,12 +91,12 @@ namespace RamType0.JsonRpc.Client
                 default:
                     return null;
             }
-            
+
         }
 
         public Exception AsException<T>(ResponseError<T> error)
         {
-            return FromPreDefinedError(error)?? new ResponseErrorException<T>(error);
+            return FromPreDefinedError(error) ?? new ResponseErrorException<T>(error);
         }
     }
     public struct ResponseError<T>
@@ -111,56 +110,45 @@ namespace RamType0.JsonRpc.Client
 
     }
 
-        [System.Serializable]
+    [System.Serializable]
     public class ResponseErrorException<T> : System.IO.IOException
     {
         public ResponseError<T> Error { get; }
-        public ResponseErrorException(ResponseError<T> error) :base(error.Message)
+        public ResponseErrorException(ResponseError<T> error) : base(error.Message)
         {
             Error = error;
         }
-        
+
     }
 
-        public class RequestParsingException<T> : ResponseErrorException<T>
+    public class RequestParsingException<T> : ResponseErrorException<T>
+    {
+        public RequestParsingException(ResponseError<T> error) : base(error)
         {
-            public RequestParsingException(ResponseError<T> error) : base(error)
-            {
-            }
         }
+    }
 
 
 
-        [Serializable]
-        public class ServerInternalErrorException<T> : ResponseErrorException<T>
+    [Serializable]
+    public class ServerInternalErrorException<T> : ResponseErrorException<T>
+    {
+        public ServerInternalErrorException(ResponseError<T> error) : base(error)
         {
-            public ServerInternalErrorException(ResponseError<T> error) : base(error)
-            {
-            }
         }
+    }
 
 
     [Serializable]
     public class ServerNotInitializedException<T> : InvalidOperationException
     {
         public ResponseError<T> Error { get; }
-        public ServerNotInitializedException(ResponseError<T> error):base(error.Message)
-        {
-            Error = error;
-        }
-        
-    }
-
-        [System.Serializable]
-    public class RequestCancelledException<T> : System.OperationCanceledException
-    {
-        public ResponseError<T> Error { get; }
-        public RequestCancelledException(ResponseError<T> error) : base(error.Message) 
+        public ServerNotInitializedException(ResponseError<T> error) : base(error.Message)
         {
             Error = error;
         }
 
     }
 
-    
+
 }

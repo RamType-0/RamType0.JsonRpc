@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Utf8Json;
 
 namespace RamType0.JsonRpc.Server
 {
-   
+
     public interface IRpcMethodProxy<TDelegate, in TParams>
         where TDelegate : Delegate
         where TParams : IMethodParams
@@ -12,12 +11,12 @@ namespace RamType0.JsonRpc.Server
         /// <summary>
         /// <paramref name="rpcMethod"/>に<paramref name="parameters"/>を引数に変換して呼び出し、<paramref name="id"/>が<see langword="null"/>でなければ呼び出し結果に基づいたレスポンスを生成、それを<paramref name="output"/>に伝えるまでを全て代行します。
         /// </summary>
-        /// <param name="server">呼び出し元の<see cref="JsonRpcServer"/>。</param>
+        /// <param name="server">呼び出し元の<see cref="Server"/>。</param>
         /// <param name="output">レスポンスの最終的な出力を行う<see cref="IResponseOutput"/>。</param>
         /// <param name="rpcMethod"></param>
         /// <param name="parameters"></param>
         /// <param name="id"></param>
-        ValueTask DelegateResponse(JsonRpcServer server,TDelegate rpcMethod, TParams parameters, ID? id = null);
+        ValueTask DelegateResponse(Server server, TDelegate rpcMethod, TParams parameters, ID? id = null);
     }
 
     public readonly struct DefaultFunctionProxy<TDelegate, TParams, TResult, TInvoker> : IRpcMethodProxy<TDelegate, TParams>
@@ -32,7 +31,7 @@ namespace RamType0.JsonRpc.Server
 
         public TInvoker Invoker { get; }
 
-        public ValueTask DelegateResponse(JsonRpcServer server,TDelegate rpcMethod, TParams parameters, ID? id = null)
+        public ValueTask DelegateResponse(Server server, TDelegate rpcMethod, TParams parameters, ID? id = null)
         {
             TResult result;
             var output = server.Output;
@@ -49,7 +48,7 @@ namespace RamType0.JsonRpc.Server
                 {
                     try
                     {
-                        return output.ResponseResult(new ResultResponse<TResult>(requestID, result));
+                        return output.ResponseResult(server,new ResultResponse<TResult>(requestID, result));
                     }
                     catch (Exception e)
                     {
@@ -72,7 +71,7 @@ namespace RamType0.JsonRpc.Server
         }
 
         public TInvoker Invoker { get; }
-        public ValueTask DelegateResponse(JsonRpcServer server,  TDelegate rpcMethod, TParams parameters, ID? id = null)
+        public ValueTask DelegateResponse(Server server, TDelegate rpcMethod, TParams parameters, ID? id = null)
         {
             var output = server.Output;
             try
@@ -88,7 +87,7 @@ namespace RamType0.JsonRpc.Server
                 {
                     try
                     {
-                        return output.ResponseResult(ResultResponse.Create(requestID));
+                        return output.ResponseResult(server,ResultResponse.Create(requestID));
                     }
                     catch (Exception e)
                     {
@@ -112,38 +111,38 @@ namespace RamType0.JsonRpc.Server
         }
 
         public TInvoker Invoker { get; }
-        public ValueTask DelegateResponse(JsonRpcServer server, TDelegate rpcMethod, TParams parameters, ID? id = null)
+        public ValueTask DelegateResponse(Server server, TDelegate rpcMethod, TParams parameters, ID? id = null)
         {
             var output = server.Output;
-            
 
-                try
-                {
-                    parameters.ID = id;
 
-                    Invoker.Invoke(rpcMethod, parameters);
-                }
-                catch (Exception e)
+            try
+            {
+                parameters.ID = id;
+
+                Invoker.Invoke(rpcMethod, parameters);
+            }
+            catch (Exception e)
+            {
+                return server.ExceptionHandler.OnException(server, id, e);
+            }
+            {
+                if (id is ID requestID)
                 {
-                    return server.ExceptionHandler.OnException(server, id, e);
-                }
-                {
-                    if (id is ID requestID)
+                    try
                     {
-                        try
-                        {
-                            return output.ResponseResult(ResultResponse.Create(requestID));
-                        }
-                        catch (Exception e)
-                        {
-                            return server.ExceptionHandler.OnException(server, id, e);
-                        }
+                        return output.ResponseResult(server,ResultResponse.Create(requestID));
                     }
-                    return new ValueTask();
+                    catch (Exception e)
+                    {
+                        return server.ExceptionHandler.OnException(server, id, e);
+                    }
                 }
-            
-            
-            
+                return new ValueTask();
+            }
+
+
+
         }
 
     }
@@ -159,38 +158,38 @@ namespace RamType0.JsonRpc.Server
         }
 
         public TInvoker Invoker { get; }
-        public ValueTask DelegateResponse(JsonRpcServer server,TDelegate rpcMethod, TParams parameters, ID? id = null)
+        public ValueTask DelegateResponse(Server server, TDelegate rpcMethod, TParams parameters, ID? id = null)
         {
             var output = server.Output;
-            
-                TResult result;
 
-                try
-                {
-                    parameters.ID = id;
+            TResult result;
 
-                    result = Invoker.Invoke(rpcMethod, parameters);
-                }
-                catch (Exception e)
+            try
+            {
+                parameters.ID = id;
+
+                result = Invoker.Invoke(rpcMethod, parameters);
+            }
+            catch (Exception e)
+            {
+                return server.ExceptionHandler.OnException(server, id, e);
+            }
+            {
+                if (id is ID requestID)
                 {
-                    return server.ExceptionHandler.OnException(server, id, e);
-                }
-                {
-                    if (id is ID requestID)
+                    try
                     {
-                        try
-                        {
-                            return output.ResponseResult(ResultResponse.Create(requestID, result));
-                        }
-                        catch (Exception e)
-                        {
-                            return server.ExceptionHandler.OnException(server, id, e);
-                        }
+                        return output.ResponseResult(server,ResultResponse.Create(requestID, result));
                     }
-                    return new ValueTask();
+                    catch (Exception e)
+                    {
+                        return server.ExceptionHandler.OnException(server, id, e);
+                    }
                 }
-            
-            
+                return new ValueTask();
+            }
+
+
         }
 
     }

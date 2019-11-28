@@ -19,7 +19,7 @@ namespace RamType0.JsonRpc
                 var copy = reader;
                 if (!ReadIsVersion2(ref reader))
                 {
-                    
+
                     ThrowJsonRpcFormatException(copy.ReadString());
                 }
 

@@ -7,19 +7,19 @@ namespace RamType0.JsonRpc.Server
 {
     public interface IResponseMessage : IMessage
     {
-        [DataMember(Name ="id")]
+        [DataMember(Name = "id")]
         ID? ID { get; set; }
     }
     public interface IErrorResponse : IResponseMessage
     {
-        [DataMember(Name ="error")]
+        [DataMember(Name = "error")]
         ErrorObject Error { get; set; }
     }
 
     public interface IErrorResponse<T> : IErrorResponse
         where T : notnull
     {
-        [DataMember(Name ="error")]
+        [DataMember(Name = "error")]
         new ErrorObject<T> Error { get; set; }
         ErrorObject IErrorResponse.Error
         {
@@ -40,7 +40,7 @@ namespace RamType0.JsonRpc.Server
 
     interface IResultResponse<out T> : IResultResponse
     {
-        [DataMember(Name ="result")]
+        [DataMember(Name = "result")]
         T Result { get; }
         //object? IResultResponse.result => result;
     }
@@ -52,15 +52,15 @@ namespace RamType0.JsonRpc.Server
 
     interface IErrorObject
     {
-        [DataMember(Name ="code")]
+        [DataMember(Name = "code")]
         public long Code { get; set; }
-        [DataMember(Name ="message")]
+        [DataMember(Name = "message")]
         public string Message { get; set; }
     }
 
     interface IErrorObject<out T> : IErrorObject
     {
-        [DataMember(Name ="data")]
+        [DataMember(Name = "data")]
         T Data { get; }
     }
 
@@ -70,7 +70,7 @@ namespace RamType0.JsonRpc.Server
     /// <typeparam name="T"></typeparam>
     public struct ResultResponse<T> : IResultResponse<T>
     {
-        [DataMember(Name ="jsonrpc")]
+        [DataMember(Name = "jsonrpc")]
         public JsonRpcVersion Version => default;
         [DataMember(Name = "result")]
         public T Result { get; set; }
@@ -84,9 +84,9 @@ namespace RamType0.JsonRpc.Server
             this.Result = result;
             this.ID = id;
         }
-        
+
     }
-    
+
     /// <summary>
     /// 戻り値を持たないJsonRpcメソッドが正常に完了した際の応答を示します。
     /// </summary>
@@ -98,7 +98,7 @@ namespace RamType0.JsonRpc.Server
         /// <summary>
         /// nullとしてシリアライズさせるためのダミーです
         /// </summary>
-        [DataMember(Name = "result")] 
+        [DataMember(Name = "result")]
         public NullResult Result => default;
         [DataMember(Name = "id")]
         public ID ID { get; set; }
@@ -127,7 +127,7 @@ namespace RamType0.JsonRpc.Server
         [JsonFormatter(typeof(ID.Formatter.Nullable))]
         [DataMember(Name = "id")]
         public ID? ID { get; set; }
-        [DataMember(Name ="error")]
+        [DataMember(Name = "error")]
         public ErrorObject<T> Error { get; set; }
 
         internal ErrorResponse(ID? id, ErrorObject<T> error) : this()
@@ -139,11 +139,11 @@ namespace RamType0.JsonRpc.Server
     public struct ErrorObject<T> : IErrorObject<T>
         where T : notnull
     {
-        [DataMember(Name ="code")]
+        [DataMember(Name = "code")]
         public long Code { get; set; }
-        [DataMember(Name ="message")]
+        [DataMember(Name = "message")]
         public string Message { get; set; }
-        [DataMember(Name ="data")]
+        [DataMember(Name = "data")]
         public T Data { get; set; }
 
         public ErrorObject(ErrorCode code, string message, T data)
@@ -162,9 +162,9 @@ namespace RamType0.JsonRpc.Server
     {
         public JsonRpcVersion Version => default;
         [JsonFormatter(typeof(ID.Formatter.Nullable))]
-        [DataMember(Name ="id")]
+        [DataMember(Name = "id")]
         public ID? ID { get; set; }
-        [DataMember(Name ="error")]
+        [DataMember(Name = "error")]
         public ErrorObject Error { get; set; }
 
         public ErrorResponse(ID? id, ErrorObject error) : this()
@@ -199,7 +199,7 @@ namespace RamType0.JsonRpc.Server
             return new ErrorResponse(requestID, new ErrorObject(ErrorCode.InvalidParams, $"The params of request object was invalid. Assigned params:{paramsJson}"));
         }
 
-        
+
         public static ErrorResponse InvalidRequest(string requestJson)
         {
             return new ErrorResponse(null, new ErrorObject(ErrorCode.InvalidRequest, $"The request object was invalid. Assigned request:{requestJson}"));
@@ -213,9 +213,9 @@ namespace RamType0.JsonRpc.Server
     }
     public struct ErrorObject : IErrorObject
     {
-        [DataMember(Name ="code")]
+        [DataMember(Name = "code")]
         public long Code { get; set; }
-        [DataMember(Name ="message")]
+        [DataMember(Name = "message")]
         public string Message { get; set; }
 
         public ErrorObject(ErrorCode code, string message)
