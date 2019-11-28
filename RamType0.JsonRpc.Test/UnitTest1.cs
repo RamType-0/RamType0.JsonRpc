@@ -29,8 +29,8 @@ namespace RamType0.JsonRpc.Test
         {
 
             var dic = CreateServer();
-            dic.Register("log", RpcEntry.FromDelegate<Action<string>>((str) => Debug.WriteLine(str)));
-            dic.Register("none", RpcEntry.FromDelegate<Action>(() => { }));
+            dic.Register("log", RpcMethodEntry.FromDelegate<Action<string>>((str) => Debug.WriteLine(str)));
+            dic.Register("none", RpcMethodEntry.FromDelegate<Action>(() => { }));
             dic.ResolveAsync(
                 "{\"jsonrpc\":\"2.0\"," +
                 "\"params\":{\"str\":\"Hello\"}," +
@@ -69,7 +69,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("log1", RpcEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
+            dic.Register("log1", RpcMethodEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
             var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
                 "\"params\":[\"10MegaShock!!!\"]," +
@@ -90,7 +90,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("log2", RpcEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
+            dic.Register("log2", RpcMethodEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
@@ -111,7 +111,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("log3", RpcEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
+            dic.Register("log3", RpcMethodEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
 
             var bytes = Encoding.UTF8.GetBytes(
                 //"{\"jsonrpc\":\"2.0\"," +
@@ -129,7 +129,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("log4", RpcEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
+            dic.Register("log4", RpcMethodEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
 
             var bytes = Encoding.UTF8.GetBytes(
                 "{" +
@@ -149,7 +149,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("log5", RpcEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
+            dic.Register("log5", RpcMethodEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
 
             var bytes = Encoding.UTF8.GetBytes(
                 "{" +
@@ -168,7 +168,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("log6", RpcEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
+            dic.Register("log6", RpcMethodEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
                 "{\"jsonrpc\":\"2.0\"," +
@@ -192,7 +192,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("idInject", RpcEntry.FromDelegate<TestInjectID>(IDInject));
+            dic.Register("idInject", RpcMethodEntry.FromDelegate<TestInjectID>(IDInject));
 
             for (int i = 0; i < 10_000_000; i++)
             {
@@ -211,7 +211,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("sT", RpcEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
+            dic.Register("sT", RpcMethodEntry.FromDelegate<Func<string, string>>((str) => { return str; }));
 
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
@@ -231,7 +231,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("mul2", RpcEntry.FromDelegate<Func<long, long>>((number) => { return number * 2; }));
+            dic.Register("mul2", RpcMethodEntry.FromDelegate<Func<long, long>>((number) => { return number * 2; }));
 
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(
@@ -252,7 +252,7 @@ namespace RamType0.JsonRpc.Test
         {
             var dic = CreateServer();
 
-            dic.Register("mul3", RpcEntry.FromDelegate<Func<long, long>>((number) => { return number * 3; }));
+            dic.Register("mul3", RpcMethodEntry.FromDelegate<Func<long, long>>((number) => { return number * 3; }));
 
             //var tasks = new Task[10000000];
             var bytes = Encoding.UTF8.GetBytes(

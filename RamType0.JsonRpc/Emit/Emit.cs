@@ -155,7 +155,7 @@ namespace RamType0.JsonRpc
         }
         internal abstract class RpcEntryFactory
         {
-            public abstract RpcEntry NewEntry(Delegate rpcMethod);
+            public abstract RpcMethodEntry NewEntry(Delegate rpcMethod);
         }
         internal static class DelegateTypeBasedRpcEntryFactoryCache<T>
             where T : Delegate
@@ -174,7 +174,7 @@ namespace RamType0.JsonRpc
             where TParams : struct, IMethodParams
             where TDeserializer : struct, IParamsDeserializer<TParams>
         {
-            public override sealed RpcEntry NewEntry(Delegate rpcMethod)
+            public override sealed RpcMethodEntry NewEntry(Delegate rpcMethod)
             {
 
                 return new RpcEntry<TProxy, TDelegate, TParams, TDeserializer>(default, (TDelegate)(rpcMethod), default);

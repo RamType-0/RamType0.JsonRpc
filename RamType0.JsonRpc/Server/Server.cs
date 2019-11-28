@@ -9,7 +9,7 @@ namespace RamType0.JsonRpc.Server
 {
     public class Server
     {
-        internal ConcurrentDictionary<EscapedUTF8String, RpcEntry> RpcMethods { get; set; } = new ConcurrentDictionary<EscapedUTF8String, RpcEntry>();
+        internal ConcurrentDictionary<EscapedUTF8String, RpcMethodEntry> RpcMethods { get; set; } = new ConcurrentDictionary<EscapedUTF8String, RpcMethodEntry>();
         public IResponseOutput Output { get; }
 
         public IJsonFormatterResolver JsonResolver { get; }
@@ -23,7 +23,7 @@ namespace RamType0.JsonRpc.Server
         }
 
         public Server(IResponseOutput output, IJsonFormatterResolver jsonResolver) : this(output, jsonResolver, DefaultRpcExceptionHandler.Instance) { }
-        public void Register(string methodName, RpcEntry entry)
+        public void Register(string methodName, RpcMethodEntry entry)
         {
             RpcMethods.TryAdd(EscapedUTF8String.FromUnEscaped(methodName), entry);
         }
@@ -204,16 +204,16 @@ namespace RamType0.JsonRpc.Server
             return ret;
         }
     }
-    public abstract class RpcEntry
+    public abstract class RpcMethodEntry
     {
-        public static RpcEntry FromDelegate<T>(T d)
+        public static RpcMethodEntry FromDelegate<T>(T d)
             where T : Delegate
         {
             return Emit.FromDelegate(d).NewEntry(d);
         }
         public abstract ValueTask InvokeAsync(Server server, ArraySegment<byte> parametersSegment, ID? id);
     }
-    public sealed class RpcEntry<TProxy, TDelegate, TParams, TDeserializer> : RpcEntry
+    public sealed class RpcEntry<TProxy, TDelegate, TParams, TDeserializer> : RpcMethodEntry
         where TProxy : notnull, IRpcMethodProxy<TDelegate, TParams>
         where TDelegate : Delegate
         where TParams : IMethodParams

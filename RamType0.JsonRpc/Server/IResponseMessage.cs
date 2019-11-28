@@ -130,7 +130,7 @@ namespace RamType0.JsonRpc.Server
         [DataMember(Name = "error")]
         public ErrorObject<T> Error { get; set; }
 
-        internal ErrorResponse(ID? id, ErrorObject<T> error) : this()
+        public ErrorResponse(ID? id, ErrorObject<T> error) : this()
         {
             this.ID = id;
             this.Error = error;
