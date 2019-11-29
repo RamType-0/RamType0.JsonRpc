@@ -33,39 +33,6 @@ namespace RamType0.JsonRpc.Server
             return RpcMethods.TryRemove(EscapedUTF8String.FromUnEscaped(methodName), out _);
         }
 
-        //internal CancellationTokenSource GetCancellationTokenSource(ID id)
-        //{
-        //    var source = CancellationSourcePool.Get();
-        //    if(!Cancellables.TryAdd(id, source))
-        //    {
-        //        throw new ArgumentException("ID conflicted!");//InvalidOperationExceptionにしてたけど同名の型作ったときはArgumentExceptionだったので・・・
-        //    }
-        //    return source;
-        //}
-        //internal DefaultObjectPool<CancellationTokenSource> CancellationSourcePool { get; } = new DefaultObjectPool<CancellationTokenSource>(CancellationSourcePooledPolicy.Instance);
-        //sealed class CancellationSourcePooledPolicy : PooledObjectPolicy<CancellationTokenSource>
-        //{
-        //    public static CancellationSourcePooledPolicy Instance { get; } = new CancellationSourcePooledPolicy();
-        //    public override CancellationTokenSource Create()
-        //    {
-        //        return new CancellationTokenSource();
-        //    }
-
-        //    public override bool Return(CancellationTokenSource obj)
-        //    {
-        //        if (obj.IsCancellationRequested)
-        //        {
-        //            obj.Dispose();
-        //            return false;
-        //        }
-        //        else
-        //        {
-        //            return true;
-        //        }
-        //    }
-        //}
-        //internal ConcurrentDictionary<ID, CancellationTokenSource> Cancellables { get; } = new ConcurrentDictionary<ID, CancellationTokenSource>();
-
         
         public ValueTask ResolveAsync(ArraySegment<byte> json)
         {
