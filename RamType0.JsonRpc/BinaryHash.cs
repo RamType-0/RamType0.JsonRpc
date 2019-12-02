@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-
+using System.Runtime.InteropServices;
+using System.Numerics;
 namespace RamType0.JsonRpc
 {
     public static class BinaryHash
@@ -35,7 +36,7 @@ namespace RamType0.JsonRpc
                 default:
                     var hash = (uint)((GetElementUnsafeAs<ulong>(span) ^ GetElementUnsafeAs<ulong>(span, length - 8)).GetHashCode());
                     var shifts = length & 31;
-                    return (int)((hash << (32 - shifts)) | (hash >> shifts));//循環右シフト。一旦uintにしないと算術シフトのせいで1まみれになるので注意。
+                    return (int) BitOperations.RotateRight(hash, shifts);
             }
         }
         /// <summary>
@@ -48,6 +49,11 @@ namespace RamType0.JsonRpc
             where T : unmanaged
         {
             return Unsafe.As<byte, T>(ref Unsafe.AsRef(span[index]));
+        }
+        private static T GetElementUnsafeAs<T>(ReadOnlySpan<byte> span)
+            where T : unmanaged
+        {
+            return Unsafe.As<byte, T>(ref MemoryMarshal.GetReference(span));
         }
     }
 }
