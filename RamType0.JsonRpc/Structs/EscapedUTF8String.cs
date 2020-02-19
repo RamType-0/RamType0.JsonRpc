@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Utf8Json;
 namespace RamType0.JsonRpc
 {
@@ -79,17 +80,16 @@ namespace RamType0.JsonRpc
         /// <returns></returns>
         public override string ToString()
         {
-            ArrayPool<byte> pool = ArrayPool<byte>.Shared;
-            var array = GetQuoted(pool).Array!;
+            var array = GetQuoted().Array!;
             var str = new JsonReader(array).ReadString();
-            pool.Return(array);
+            ArrayPool<byte>.Shared.Return(array);
             return str;
         }
-
-        public ArraySegment<byte> GetQuoted(ArrayPool<byte> pool)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ArraySegment<byte> GetQuoted()
         {
             int length = QuotedLength;
-            var array = pool.Rent(length);
+            var array = ArrayPool<byte>.Shared.Rent(length);
             var segment = new ArraySegment<byte>(array, 0, length);
             GetQuotedCore(segment);
             return segment;

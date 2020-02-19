@@ -47,8 +47,7 @@ namespace RamType0.JsonRpc
         /// <returns></returns>
         public static bool UnEscapeUnsafe(EscapedUTF8String escaped, out UTF8String str)
         {
-            var pool = ArrayPool<byte>.Shared;
-            var quoted = escaped.GetQuoted(pool);
+            var quoted = escaped.GetQuoted();
             var reader = new JsonReader(quoted.Array, quoted.Offset);
 
             var segment = reader.ReadStringSegmentUnsafe();
@@ -59,7 +58,7 @@ namespace RamType0.JsonRpc
             }
             else
             {
-                pool.Return(quoted.Array!);
+                ArrayPool<byte>.Shared.Return(quoted.Array!);
                 return false;
             }
         }
