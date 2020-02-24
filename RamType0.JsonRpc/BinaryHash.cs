@@ -18,9 +18,8 @@ namespace RamType0.JsonRpc
             {
                 case 0:
                     return 0;
-
                 case 1:
-                    return span[0].GetHashCode();
+                    return Unsafe.ReadUnaligned<byte>(ref MemoryMarshal.GetReference(span)).GetHashCode();
                 case 2:
                     return GetElementUnsafeAs<ushort>(span).GetHashCode();
                 case 3:
