@@ -47,7 +47,7 @@ namespace RamType0.JsonRpc
         private static T GetElementUnsafeAs<T>(ReadOnlySpan<byte> span, int index)
             where T : unmanaged
         {
-            return Unsafe.ReadUnaligned<T>(ref Unsafe.Add(ref MemoryMarshal.GetReference(span),index));
+            return Unsafe.ReadUnaligned<T>(ref Unsafe.AddByteOffset(ref MemoryMarshal.GetReference(span),(IntPtr)index));
         }
         private static T GetElementUnsafeAs<T>(ReadOnlySpan<byte> span)
             where T : unmanaged

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Utf8Json;
@@ -40,82 +42,208 @@ namespace RamType0.JsonRpc.Server
             if (reader.ReadIsBeginObject())
             {
 
-                ReadOnlySpan<byte> jsonrpcSpan = stackalloc byte[] { (byte)'j', (byte)'s', (byte)'o', (byte)'n', (byte)'r', (byte)'p', (byte)'c', },
-                    versionSpan = stackalloc byte[] { (byte)'2', (byte)'.', (byte)'0', },
-                    methodSpan = stackalloc byte[] { (byte)'m', (byte)'e', (byte)'t', (byte)'h', (byte)'o', (byte)'d', },
-                    idSpan = stackalloc byte[] { (byte)'i', (byte)'d', },
-                paramsSpan = stackalloc byte[] { (byte)'p', (byte)'a', (byte)'r', (byte)'a', (byte)'m', (byte)'s', };
                 bool versioned = false;
                 EscapedUTF8String? methodName = null;
                 ID? id = null;
                 ArraySegment<byte> paramsSegment = default;
-                while (true)
+                try
                 {
-                    try
+                    while (true)
                     {
-                        switch (reader.GetCurrentJsonToken())
+                        reader.SkipWhiteSpace();
+                        var buffer = reader.GetBufferUnsafe().AsSpan(reader.GetCurrentOffsetUnsafe());
+                        ref var bufferRef = ref MemoryMarshal.GetReference(buffer);
+                        const uint _id = (('"') | ('i' << 8) | ('d' << 16) | ('"' << 24));
+                        const ulong method = ((ulong)'"') | ((ulong)'m' << 8) | ((ulong)'e' << 16) | ((ulong)'t' << 24) | ((ulong)'h' << 32) | ((ulong)'o' << 40) | ((ulong)'d' << 48) | ((ulong)'"' << 56);
+                        const ulong @params = ((ulong)'"') | ((ulong)'p' << 8) | ((ulong)'a' << 16) | ((ulong)'r' << 24) | ((ulong)'a' << 32) | ((ulong)'m' << 40) | ((ulong)'s' << 48) | ((ulong)'"' << 56);
+                        const ulong jsonrpc = (((ulong)'"') | ((ulong)'j' << 8) | ((ulong)'s' << 16) | ((ulong)'o' << 24) | ((ulong)'n' << 32) | ((ulong)'r' << 40) | ((ulong)'p' << 48) | ((ulong)'c' << 56));
+                        const ulong ___2_0 = (((ulong)'"') | ((ulong)'2' << 8) | ((ulong)'.' << 16) | ((ulong)'0' << 24) | ((ulong)'"' << 32)) << 24;
+
+                        switch (buffer.Length)
                         {
-                            case JsonToken.String:
+                            case 0:
+                            case 1:
+                            case 2:
+                            case 3:
+                            case 4:
+                            case 5:
+                            case 6:
+                                goto BuildRequestFailed;
+                            //最短の正常な文字列パターンは"id":1}で7byteある
+                            case 7:
+                            case 8:
+                            case 9:
+                            case 10:
+                            case 11:
                                 {
-                                    
-                                    var propertySegmentSpan = reader.ReadPropertyNameSegmentRaw().AsSpan();
-                                    if (propertySegmentSpan.SequenceEqual(jsonrpcSpan))
+                                    if (Unsafe.ReadUnaligned<uint>(ref bufferRef) == _id)
                                     {
-                                        if (reader.ReadStringSegmentRaw().AsSpan().SequenceEqual(versionSpan))
+                                        goto ID;
+                                    }
+                                    else
+                                    {
+                                        goto BuildRequestFailed;
+                                    }
+                                }
+                            //その次に短いのは"params":[]}または"params":{}}または"method":""}
+                            case 12:
+                            case 13:
+                            case 14:
+                            case 15:
+                                {
+                                    var chars8 = Unsafe.ReadUnaligned<ulong>(ref bufferRef);
+                                    switch (chars8)
+                                    {
+                                        case method:
+                                            {
+                                                goto Method;
+
+                                            }
+                                        case @params:
+                                            {
+                                                goto Params;
+                                            }
+                                        default:
+                                            {
+                                                if ((uint)chars8 == _id)
+                                                {
+                                                    goto ID;
+
+                                                }
+                                                else
+                                                {
+                                                    goto BuildRequestFailed;
+                                                }
+                                            }
+                                    }
+                                }
+                            //その次が"jsonrpc":"2.0"}
+                            default:
+                                {
+                                    var chars8 = Unsafe.ReadUnaligned<ulong>(ref bufferRef);
+                                    switch (chars8)
+                                    {
+                                        case jsonrpc:
+                                            {
+                                                goto JsonRpc;
+                                            }
+                                        case method:
+                                            {
+                                                goto Method;
+
+                                            }
+                                        case @params:
+                                            {
+                                                goto Params;
+                                            }
+                                        default:
+                                            {
+                                                if ((uint)chars8 == _id)
+                                                {
+                                                    goto ID;
+
+                                                }
+                                                else
+                                                {
+                                                    goto BuildRequestFailed;
+                                                }
+                                            }
+                                    }
+                                }
+                            JsonRpc:
+                                {
+                                    if (Unsafe.AddByteOffset(ref bufferRef,(IntPtr)(8)) == (byte)'"')
+                                    {
+                                        reader.AdvanceOffset(9);
+                                        if (reader.ReadIsNameSeparator())
                                         {
-                                            versioned = true;
+                                            reader.SkipWhiteSpace();
+                                            buffer = reader.GetBufferUnsafe().AsSpan(reader.GetCurrentOffsetUnsafe());
+                                            bufferRef = ref MemoryMarshal.GetReference(buffer);
+                                            if ((Unsafe.ReadUnaligned<ulong>(ref Unsafe.AddByteOffset(ref bufferRef, (IntPtr)(-3))) & 0xFFFFFFFFFF000000 ) == ___2_0)
+                                            {
+                                                reader.AdvanceOffset(5);
+                                                versioned = true;
+                                                break;
+                                            }
+                                            else
+                                            {
+                                                goto BuildRequestFailed;
+                                            }
                                         }
                                         else
                                         {
-                                            goto BuildRequesetFailed;
+                                            goto BuildRequestFailed;
                                         }
                                     }
-                                    else if (propertySegmentSpan.SequenceEqual(methodSpan))
+                                    else
+                                    {
+                                        goto BuildRequestFailed;
+                                    }
+                                }
+                            Method:
+                                {
+                                    reader.AdvanceOffset(8);
+                                    if (reader.ReadIsNameSeparator())
                                     {
                                         methodName = EscapedUTF8String.FromEscapedNonQuoted(reader.ReadStringSegmentRaw());
+                                        break;
                                     }
-                                    else if (propertySegmentSpan.SequenceEqual(idSpan))
+                                    else
                                     {
-                                        id = ID.Formatter.DeserializeSafe(ref reader);
+                                        goto BuildRequestFailed;
                                     }
-                                    else if (propertySegmentSpan.SequenceEqual(paramsSpan))
+
+                                }
+                            Params:
+                                {
+                                    reader.AdvanceOffset(8);
+                                    if (reader.ReadIsNameSeparator())
                                     {
                                         paramsSegment = reader.ReadNextBlockSegment();
+                                        break;
                                     }
                                     else
                                     {
-                                        reader.ReadNextBlock();
+                                        goto BuildRequestFailed;
                                     }
 
-                                    if (reader.ReadIsEndObject())
+                                }
+                            ID:
+                                {
+                                    reader.AdvanceOffset(4);
+                                    if (reader.ReadIsNameSeparator())
                                     {
-                                        goto ReachedObjectTerminal;
+                                        id = ID.Formatter.DeserializeSafe(ref reader);
+                                        break;
                                     }
                                     else
                                     {
-                                        if (!reader.ReadIsValueSeparator())
-                                        {
-                                            goto BuildRequesetFailed;
-                                        }
-                                        continue;
+                                        goto BuildRequestFailed;
                                     }
 
+                                }
+
+
+
+                        }
+                        switch (reader.GetCurrentJsonToken())
+                        {
+                            case JsonToken.ValueSeparator:
+                                {
+                                    reader.AdvanceOffset(1);
+                                    continue;
                                 }
                             case JsonToken.EndObject:
-                                {
-                                    reader.ReadIsEndObject();
-                                    goto ReachedObjectTerminal;
-                                }
+                                goto ReachedObjectTerminal;
                             default:
-                                {
-                                    goto BuildRequesetFailed;
-                                }
+                                goto BuildRequestFailed;
                         }
                     }
-                    catch (JsonParsingException)
-                    {
-                        goto BuildRequesetFailed;
-                    }
+                }
+                catch (JsonParsingException)
+                {
+                    goto BuildRequestFailed;
                 }
             ReachedObjectTerminal:
                 if (versioned && methodName is EscapedUTF8String name)
@@ -133,15 +261,15 @@ namespace RamType0.JsonRpc.Server
                 }
                 else
                 {
-                    goto BuildRequesetFailed;
+                    goto BuildRequestFailed;
                 }
             }
             else
             {
-                goto BuildRequesetFailed;
+                goto BuildRequestFailed;
             }
 
-        BuildRequesetFailed:
+        BuildRequestFailed:
             {
                 reader = new JsonReader(json.Array!, json.Offset);
                 try
