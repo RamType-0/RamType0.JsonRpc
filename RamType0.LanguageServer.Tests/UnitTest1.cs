@@ -1,7 +1,7 @@
 using NUnit.Framework;
 using System.Threading.Tasks;
 
-namespace RamType0.LanguageServer.Test
+namespace RamType0.LanguageServer.Tests
 {
     public class Tests
     {

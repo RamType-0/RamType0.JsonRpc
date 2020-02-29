@@ -21,11 +21,11 @@ namespace RamType0.JsonRpc.Server
             JsonResolver = jsonResolver;
             ExceptionHandler = exceptionHandler;
         }
-
+        public Server (IResponseOutput output) : this(output, JsonSerializer.DefaultResolver) { }
         public Server(IResponseOutput output, IJsonFormatterResolver jsonResolver) : this(output, jsonResolver, DefaultRpcExceptionHandler.Instance) { }
-        public void Register(string methodName, RpcMethodEntry entry)
+        public bool Register(string methodName, RpcMethodEntry entry)
         {
-            RpcMethods.TryAdd(EscapedUTF8String.FromUnEscaped(methodName), entry);
+            return RpcMethods.TryAdd(EscapedUTF8String.FromUnEscaped(methodName), entry);
         }
 
         public bool UnRegister(string methodName)
@@ -57,6 +57,7 @@ namespace RamType0.JsonRpc.Server
                         {
                             case JsonToken.String:
                                 {
+                                    
                                     var propertySegmentSpan = reader.ReadPropertyNameSegmentRaw().AsSpan();
                                     if (propertySegmentSpan.SequenceEqual(jsonrpcSpan))
                                     {

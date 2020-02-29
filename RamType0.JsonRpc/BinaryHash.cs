@@ -44,15 +44,15 @@ namespace RamType0.JsonRpc
         /// <param name="span"></param>
         /// <returns></returns>
         public static int GetSequenceHashCode(this Span<byte> span) => GetSequenceHashCode((ReadOnlySpan<byte>)span);
-        private static T GetElementUnsafeAs<T>(ReadOnlySpan<byte> span, int index = 0)
+        private static T GetElementUnsafeAs<T>(ReadOnlySpan<byte> span, int index)
             where T : unmanaged
         {
-            return Unsafe.As<byte, T>(ref Unsafe.AsRef(span[index]));
+            return Unsafe.ReadUnaligned<T>(ref Unsafe.Add(ref MemoryMarshal.GetReference(span),index));
         }
         private static T GetElementUnsafeAs<T>(ReadOnlySpan<byte> span)
             where T : unmanaged
         {
-            return Unsafe.As<byte, T>(ref MemoryMarshal.GetReference(span));
+            return Unsafe.ReadUnaligned<T>(ref MemoryMarshal.GetReference(span));
         }
     }
 }

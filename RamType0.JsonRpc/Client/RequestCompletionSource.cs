@@ -32,7 +32,10 @@ namespace RamType0.JsonRpc.Client
                 return true;
             }
         }
-        ManualResetValueTaskSourceCore<TResult> core;
+        ManualResetValueTaskSourceCore<TResult> core = new ManualResetValueTaskSourceCore<TResult>();
+
+       
+
         public TResult GetResult(short token)
         {
             try

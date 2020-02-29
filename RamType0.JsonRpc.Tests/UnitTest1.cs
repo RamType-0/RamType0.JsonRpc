@@ -2,11 +2,12 @@ using NUnit.Framework;
 using RamType0.JsonRpc.Server;
 using System;
 using System.Diagnostics;
+using System.IO.Pipelines;
 using System.Text;
 using System.Threading.Tasks;
 using Utf8Json;
 
-namespace RamType0.JsonRpc.Test
+namespace RamType0.JsonRpc.Tests
 {
     public class Tests
     {
@@ -50,18 +51,10 @@ namespace RamType0.JsonRpc.Test
         private static Server.Server CreateServer()
 
         {
-
-            var output = new DummyResponseOutput();
-            var server = new Server.Server(output, JsonSerializer.DefaultResolver);
+            var output = new PipeResponseOutput<PassThroughWriter>(new PassThroughWriter(), PipeWriter.Create(Console.OpenStandardOutput()));
+            _ = output.StartOutputAsync();
+            var server = new Server.Server(output);
             return server;
-        }
-
-        class DummyResponseOutput : IResponseOutput
-        {
-            ValueTask IResponseOutput.ResponseAsync<T>(Server.Server server,T response)
-            {
-                return new ValueTask();
-            }
         }
 
         [Test]
