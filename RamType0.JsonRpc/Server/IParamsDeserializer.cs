@@ -59,4 +59,41 @@ namespace RamType0.JsonRpc.Server
 
     }
 
+    public readonly struct EmptySerializedParamsDeserializer<T, TObjectStyle, TArrayStyle> : IParamsDeserializer<T>
+        where T : struct
+        where TObjectStyle : struct, IObjectStyleParamsDeserializer<T>
+        where TArrayStyle : struct, IArrayStyleParamsDeserializer<T>
+    {
+        public T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
+        {
+            T paramsObj;
+            switch (reader.GetCurrentJsonToken())
+            {
+                case JsonToken.BeginObject:
+                    {
+                        paramsObj = default(TObjectStyle).Deserialize(ref reader, formatterResolver);
+                        break;
+                    }
+                case JsonToken.BeginArray:
+                    {
+                        paramsObj = default(TArrayStyle).Deserialize(ref reader, formatterResolver);
+                        break;
+                    }
+                case JsonToken.None:
+                    {
+                        paramsObj = default;
+                        break;
+                    }
+                default:
+                    {
+                        throw new JsonParsingException("ParamsObject was not array, neither object.");
+                    }
+            }
+            return paramsObj;
+        }
+
+
+
+    }
+
 }

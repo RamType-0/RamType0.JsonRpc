@@ -16,22 +16,16 @@ namespace RamType0.JsonRpc.Internal
         void IRpcMethodBodyVoid<TParams>.Invoke(TParams parameters) => Invoke(parameters);
     }
 
-    internal interface IFunctionPointerContainer
+    public interface IFunctionPointerContainer
     {
         public IntPtr FunctionPointer { set; }
     }
 
-    internal interface IObjectReferenceContainer 
+    public interface IObjectReferenceContainer 
     { 
         public object Target { set; }
     }
 
-    internal interface IRpcInstanceMethodBodyFactory<TDelegate,TMethod,TParams,TResult>
-        where TDelegate : notnull,Delegate
-        where TMethod : IRpcMethodBody<TParams,TResult>
-    {
-        public TMethod CreateMethod(TDelegate d);
-    }
 
     public interface IMethodParamsModifier<TParams>
         where TParams :notnull

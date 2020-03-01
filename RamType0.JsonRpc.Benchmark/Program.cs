@@ -11,6 +11,28 @@ namespace RamType0.JsonRpc.Benchmark
     {
         static void Main(string[] args)
         {
+            /*
+            var tests =new Tests();
+            for (int i = 0; i < 1000; i++)
+            {
+                tests.ResolveRequestSingleThreadNew();
+            }
+
+            for (int i = 0; i < 1000; i++)
+            {
+                tests.ResolveRequestParallelNew();
+            }
+
+            for (int i = 0; i < 1000; i++)
+            {
+                tests.ResolveRequestSingleThreadServer();
+            }
+
+            for (int i = 0; i < 1000; i++)
+            {
+                tests.ResolveRequestParallelServer();
+            }
+            */
             BenchmarkRunner.Run<Tests>();
         }
     }

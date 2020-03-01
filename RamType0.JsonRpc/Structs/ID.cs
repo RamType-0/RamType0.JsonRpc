@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Utf8Json;
 
 namespace RamType0.JsonRpc
@@ -50,6 +51,18 @@ namespace RamType0.JsonRpc
             else
             {
                 return numberValue.GetHashCode();
+            }
+        }
+
+        public override string ToString()
+        {
+            if(String is EscapedUTF8String str)
+            {
+                return Encoding.UTF8.GetString(str.Span);
+            }
+            else
+            {
+                return numberValue.ToString();
             }
         }
 

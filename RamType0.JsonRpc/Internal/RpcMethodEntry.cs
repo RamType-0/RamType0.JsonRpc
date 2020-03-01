@@ -49,7 +49,17 @@ namespace RamType0.JsonRpc.Internal
         {
 
             TParams parameters;
-            var reader = new JsonReader(parametersSegment.Array!, parametersSegment.Offset);
+            JsonReader reader;
+            var array = parametersSegment.Array;
+            if(array is null)
+            {
+                reader = new JsonReader(Array.Empty<byte>());
+            }
+            else
+            {
+                reader = new JsonReader(array, parametersSegment.Offset);
+            }
+            
 
             try
             {
@@ -202,12 +212,12 @@ namespace RamType0.JsonRpc.Internal
                         //Push this
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldfld, fpField);
-                        il.EmitCalli(OpCodes.Calli, CallingConventions.Standard, methodResultType, parameterTypes, Type.EmptyTypes);
+                        il.EmitCalli(OpCodes.Calli, CallingConventions.Standard, methodResultType, parameterTypes, null);
                         if (methodResultType == typeof(void))
                         {
                             il.DeclareLocal(typeof(NullResult));
-                            il.Emit(OpCodes.Ldloca_S, (byte)0);
-                            il.Emit(OpCodes.Initobj);
+                            //il.Emit(OpCodes.Ldloca_S, (byte)0);
+                            //il.Emit(OpCodes.Initobj,typeof(NullResult));
                             il.Emit(OpCodes.Ldloc_0);
                         }
                         il.Emit(OpCodes.Ret);
@@ -236,12 +246,12 @@ namespace RamType0.JsonRpc.Internal
                         //Push this
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldfld, fpField);
-                        il.EmitCalli(OpCodes.Calli, CallingConventions.HasThis, methodResultType, parameterTypes, Type.EmptyTypes);
+                        il.EmitCalli(OpCodes.Calli, CallingConventions.HasThis, methodResultType, parameterTypes, null);
                         if (methodResultType == typeof(void))
                         {
                             il.DeclareLocal(typeof(NullResult));
-                            il.Emit(OpCodes.Ldloca_S, (byte)0);
-                            il.Emit(OpCodes.Initobj);
+                            //il.Emit(OpCodes.Ldloca_S, (byte)0);
+                            //il.Emit(OpCodes.Initobj,typeof(NullResult));
                             il.Emit(OpCodes.Ldloc_0);
                         }
                         il.Emit(OpCodes.Ret);
@@ -264,7 +274,7 @@ namespace RamType0.JsonRpc.Internal
                 type3[0] = tParams;
                 type3[1] = tObjStyle;
                 type3[2] = tArrayStyle;
-                tDeserializer = typeof(ParamsDeserializer<,,>).MakeGenericType(type3);
+                tDeserializer = serializedParameterFields.Count == 0 ? typeof(EmptySerializedParamsDeserializer<,,>).MakeGenericType(type3) : typeof(ParamsDeserializer<,,>).MakeGenericType(type3);
             }
 
             Type tModifier; 

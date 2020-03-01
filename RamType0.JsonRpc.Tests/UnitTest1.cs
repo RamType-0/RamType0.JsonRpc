@@ -1,4 +1,4 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using RamType0.JsonRpc.Server;
 using System;
 using System.Diagnostics;
@@ -260,5 +260,64 @@ namespace RamType0.JsonRpc.Tests
             //Task.WaitAll(tasks);
         }
 
+        [Test]
+        public void CalliStandardEntry()
+        {
+            var entry = Internal.RpcMethodEntry.FromDelegate<Func<int,int,int>>(Math.Max);
+            var arg = Encoding.UTF8.GetBytes("[2,1]");
+            var json = entry.ResolveRequest(arg,new ID(1), JsonSerializer.DefaultResolver);
+            var str = Encoding.UTF8.GetString(json);
+        }
+
+        [Test]
+        public void CalliHasThisEntry()
+        {
+            var entry = Internal.RpcMethodEntry.FromDelegate<Func<string>>("114514".ToString);
+            var arg = Encoding.UTF8.GetBytes("[]");
+            var json = entry.ResolveRequest(arg, new ID(1), JsonSerializer.DefaultResolver);
+            var str = Encoding.UTF8.GetString(json);
+        }
+
+        [Test]
+        public void CalliHasThisEntryEmptyParams()
+        {
+            var entry = Internal.RpcMethodEntry.FromDelegate<Func<string>>("114514".ToString);
+            var json = entry.ResolveRequest(default, new ID(1), JsonSerializer.DefaultResolver);
+            var str = Encoding.UTF8.GetString(json);
+        }
+
+        [Test]
+        public void CalliEmptyParamsInjectID()
+        {
+            var entry = Internal.RpcMethodEntry.FromDelegate<InjectID>(id => id.ToString());
+            var json = entry.ResolveRequest(default, new ID(1145141919810364364), JsonSerializer.DefaultResolver);
+            var str = Encoding.UTF8.GetString(json);
+        }
+
+        delegate string InjectID([RpcID] ID? id);
+
+
+        [Test]
+        public void CalliEmptyParamsInjectIDResolveReq()
+        {
+            var entry = Internal.RpcMethodEntry.FromDelegate<InjectID>(id => id.ToString());
+            var resolver = new Internal.RequestResolver();
+            resolver.TryRegister("공격전이다", entry);
+            var request = $"{{\"jsonrpc\":\"2.0\",\"params\":[],\"method\":\"공격전이다\",\"id\":114514}}";
+            var json = resolver.Resolve(Encoding.UTF8.GetBytes(request));
+            var str = Encoding.UTF8.GetString(json);
+            
+        }
+
+        [Test]
+        public void Calli()
+        {
+            var entry = Internal.RpcMethodEntry.FromDelegate<Action>(()=> { });
+            var resolver = new Internal.RequestResolver();
+            resolver.TryRegister("Hello", entry);
+            var request = "{\"jsonrpc\":\"2.0\",\"method\":\"Hello\",\"id\":1}";
+            var json = resolver.Resolve(Encoding.UTF8.GetBytes(request));
+            var str = Encoding.UTF8.GetString(json);
+        }
     }
 }
