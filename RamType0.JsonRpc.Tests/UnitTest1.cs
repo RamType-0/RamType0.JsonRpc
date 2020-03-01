@@ -51,7 +51,7 @@ namespace RamType0.JsonRpc.Tests
         private static Server.Server CreateServer()
 
         {
-            var output = new PipeResponseOutput<PassThroughWriter>(new PassThroughWriter(), PipeWriter.Create(Console.OpenStandardOutput()));
+            var output = new PipeMessageOutput<PassThroughWriter>(new PassThroughWriter(), PipeWriter.Create(Console.OpenStandardOutput()));
             _ = output.StartOutputAsync();
             var server = new Server.Server(output);
             return server;

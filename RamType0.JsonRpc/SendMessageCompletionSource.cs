@@ -6,11 +6,11 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 
-namespace RamType0.JsonRpc.Server
+namespace RamType0.JsonRpc
 {
-    class ResponseCompletionSource : IValueTaskSource
+    class SendMessageCompletionSource : IValueTaskSource
     {
-        public static ResponseCompletionSource Create(ReadOnlySpan<byte> serializedResponse)
+        public static SendMessageCompletionSource Create(ReadOnlySpan<byte> serializedResponse)
         {
             var source = Pool.Get();
             var buffer = ArrayPool<byte>.Shared.Rent(serializedResponse.Length);
@@ -19,16 +19,16 @@ namespace RamType0.JsonRpc.Server
             source.serializedResponse = new ArraySegment<byte>(buffer, 0, serializedResponse.Length);
             return source;
         }
-        static ObjectPool<ResponseCompletionSource> Pool { get; } = new DefaultObjectPool<ResponseCompletionSource>(new PoolPolicy());
+        static ObjectPool<SendMessageCompletionSource> Pool { get; } = new DefaultObjectPool<SendMessageCompletionSource>(new PoolPolicy());
 
-        sealed class PoolPolicy : PooledObjectPolicy<ResponseCompletionSource>
+        sealed class PoolPolicy : PooledObjectPolicy<SendMessageCompletionSource>
         {
-            public override ResponseCompletionSource Create()
+            public override SendMessageCompletionSource Create()
             {
-                return new ResponseCompletionSource();
+                return new SendMessageCompletionSource();
             }
 
-            public override bool Return(ResponseCompletionSource obj)
+            public override bool Return(SendMessageCompletionSource obj)
             {
                 obj.core.Reset();
                 

@@ -10,21 +10,26 @@ namespace RamType0.JsonRpc
 {
     static partial class Emit
     {
-        static ModuleBuilder ModuleBuilder { get; } = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("RamType0.JsonRpc.DynamicAssembly"), AssemblyBuilderAccess.Run).DefineDynamicModule("RamType0.JsonRpc.DynamicModule");
+        internal static ModuleBuilder ModuleBuilder { get; } = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("RamType0.JsonRpc.DynamicAssembly"), AssemblyBuilderAccess.Run).DefineDynamicModule("RamType0.JsonRpc.DynamicModule");
         #region 不毛なプーリング
         [ThreadStatic]
         static Type[]? typeArray1;
-        static Type[] TypeArray1 => typeArray1 ??= new Type[1];
+        internal static Type[] TypeArray1 => typeArray1 ??= new Type[1];
         [ThreadStatic]
         static Type[]? typeArray2;
-        static Type[] TypeArray2 => typeArray2 ??= new Type[2];
+        internal static Type[] TypeArray2 => typeArray2 ??= new Type[2];
         [ThreadStatic]
         static Type[]? typeArray3;
-        static Type[] TypeArray3 => typeArray3 ??= new Type[3];
+        internal static Type[] TypeArray3 => typeArray3 ??= new Type[3];
         [ThreadStatic]
         static Type[]? typeArray4;
-        static Type[] TypeArray4 => typeArray4 ??= new Type[4];
-
+        internal static Type[] TypeArray4 => typeArray4 ??= new Type[4];
+        [ThreadStatic]
+        static Type[]? typeArray5;
+        internal static Type[] TypeArray5 => typeArray5 ??= new Type[5];
+        [ThreadStatic]
+        static Type[]? typeArray6;
+        internal static Type[] TypeArray6 => typeArray6 ??= new Type[6];
         #endregion
         internal static RpcEntryFactory FromDelegate<T>(T d)
             where T : Delegate

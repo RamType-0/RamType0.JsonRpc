@@ -13,30 +13,25 @@ using System.Threading;
 
 namespace RamType0.JsonRpc
 {
-    public class PipeResponseOutput<T> : IResponseOutput
-        where T: notnull,IResponseWriter
+    using Marshaling;
+    public class PipeMessageOutput<T> : IDuplexOutput
+        where T: notnull,IMessageWriter
     {
         T writer;
-        public PipeResponseOutput(T writer,PipeWriter outputPipe)
+        public PipeMessageOutput(T writer,PipeWriter outputPipe)
         {
             this.writer = writer;
-            Responses = Channel.CreateUnbounded<ResponseCompletionSource>(new UnboundedChannelOptions() { AllowSynchronousContinuations = false, SingleReader = true, SingleWriter = false });
+            Responses = Channel.CreateUnbounded<SendMessageCompletionSource>(new UnboundedChannelOptions() { AllowSynchronousContinuations = false, SingleReader = true, SingleWriter = false });
             OutputPipe = outputPipe;
         }
-        Channel<ResponseCompletionSource> Responses { get; }
+        Channel<SendMessageCompletionSource> Responses { get; }
         PipeWriter OutputPipe { get; }
 
-        ValueTask IResponseOutput.ResponseAsync<TResponse>(Server.Server server, TResponse response)
-        {
-            var tmp = JsonSerializer.SerializeUnsafe(response);
-            var source = ResponseCompletionSource.Create(tmp);
-            _ = Responses.Writer.WriteAsync(source);
-            return source.Task;
-        }
+        
         public async ValueTask StartOutputAsync(CancellationToken cancellationToken = default)
         {
 
-            IAsyncEnumerator<ResponseCompletionSource>? enumerator = null;
+            IAsyncEnumerator<SendMessageCompletionSource>? enumerator = null;
             try
             {
                 enumerator = Responses.Reader.ReadAllAsync(cancellationToken).GetAsyncEnumerator();
@@ -79,7 +74,7 @@ namespace RamType0.JsonRpc
             }
         }
 
-        void WriteResponse(ResponseCompletionSource source)
+        void WriteResponse(SendMessageCompletionSource source)
         {
             var serializedResponse = source.SerializedResponse;
             var span = serializedResponse.AsSpan();
@@ -93,32 +88,36 @@ namespace RamType0.JsonRpc
                 source.SetException(e);
             }
         }
+        ValueTask IResponseOutput.ResponseAsync<TResponse>(Server.Server server, TResponse response)
+        {
+            var tmp = JsonSerializer.SerializeUnsafe(response);
+            var source = SendMessageCompletionSource.Create(tmp);
+            _ = Responses.Writer.WriteAsync(source);
+            return source.Task;
+        }
+        ValueTask IRequestOutput.SendRequestAsync<TParams>(Client.Client client, Request<TParams> request)
+        {
+            var tmp = JsonSerializer.SerializeUnsafe(request);
+            var source = SendMessageCompletionSource.Create(tmp);
+            _ = Responses.Writer.WriteAsync(source);
+            return source.Task;
+        }
 
+        ValueTask IRequestOutput.SendNotification<TParams>(Client.Client client, Notification<TParams> notification)
+        {
+            var tmp = JsonSerializer.SerializeUnsafe(notification);
+            var source = SendMessageCompletionSource.Create(tmp);
+            _ = Responses.Writer.WriteAsync(source);
+            return source.Task;
+        }
     }
 
-    public struct PassThroughWriter : IResponseWriter
+    public struct PassThroughWriter : IMessageWriter
     {
         public void WriteResponse(PipeWriter writer,ReadOnlySpan<byte> serializedResponse)
         {
             serializedResponse.CopyTo(writer.GetSpan(serializedResponse.Length));
             writer.Advance(serializedResponse.Length);
-        }
-    }
-
-    public interface IResponseWriter
-    {
-        void WriteResponse(PipeWriter writer,ReadOnlySpan<byte> serializedResponse);
-        /// <summary>
-        /// 戻り値の<see cref="ValueTask"/>が完了、または例外をスローした時点で<paramref name="serializedResponse"/>は利用できなくなります。必要な場合、事前にコピーしてください。
-        /// </summary>
-        /// <param name="writer"></param>
-        /// <param name="serializedResponse"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        ValueTask WriteResponseAsync(PipeWriter writer, ReadOnlyMemory<byte> serializedResponse,CancellationToken cancellationToken = default)
-        {
-            WriteResponse(writer, serializedResponse.Span);
-            return new ValueTask();
         }
     }
 }

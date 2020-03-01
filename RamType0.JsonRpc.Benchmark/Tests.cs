@@ -7,6 +7,11 @@ using BenchmarkDotNet.Attributes;
 using System.IO.Pipelines;
 using RamType0.JsonRpc.Server;
 using System.Threading.Tasks;
+using StreamJsonRpc;
+using StreamJsonRpc.Protocol;
+using StreamJsonRpc.Reflection;
+using System.IO.Pipes;
+using System.IO;
 
 namespace RamType0.JsonRpc.Benchmark
 {
@@ -15,12 +20,29 @@ namespace RamType0.JsonRpc.Benchmark
         Server.Server server;
         public Tests()
         {
-            var output = new PipeResponseOutput<PassThroughWriter>(new PassThroughWriter(), PipeWriter.Create(Console.OpenStandardError()));
+            
+            
+
+            var output = new PipeMessageOutput<PassThroughWriter>(new PassThroughWriter(), PipeWriter.Create(Console.OpenStandardError()));
             _ = output.StartOutputAsync();
             server = new Server.Server(output);
             server.Register("Hello", RpcMethodEntry.FromDelegate(new Func<string>(() => "World!")));
+
+
+
+            //var stream = new NamedPipeClientStream("StreamJsonRpc");
+            //stream.Connect();
+            //StreamJsonRpc.JsonRpc.Attach(stream, this);
+            
+            
             
         }
+
+        public int StreamJsonRpcAdd(int a, int b)
+        {
+            return a + b;
+        }
+
         [Benchmark]
         public void ResolveRequestSingleThread()
         {

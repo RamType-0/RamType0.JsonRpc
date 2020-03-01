@@ -68,7 +68,7 @@ namespace RamType0.JsonRpc.Server
                             case 4:
                             case 5:
                             case 6:
-                                goto BuildRequestFailed;
+                                goto BuildMessageFailed;
                             //最短の正常な文字列パターンは"id":1}で7byteある
                             case 7:
                             case 8:
@@ -82,7 +82,7 @@ namespace RamType0.JsonRpc.Server
                                     }
                                     else
                                     {
-                                        goto BuildRequestFailed;
+                                        goto BuildMessageFailed;
                                     }
                                 }
                             //その次に短いのは"params":[]}または"params":{}}または"method":""}
@@ -112,7 +112,7 @@ namespace RamType0.JsonRpc.Server
                                                 }
                                                 else
                                                 {
-                                                    goto BuildRequestFailed;
+                                                    goto BuildMessageFailed;
                                                 }
                                             }
                                     }
@@ -145,7 +145,7 @@ namespace RamType0.JsonRpc.Server
                                                 }
                                                 else
                                                 {
-                                                    goto BuildRequestFailed;
+                                                    goto BuildMessageFailed;
                                                 }
                                             }
                                     }
@@ -168,17 +168,17 @@ namespace RamType0.JsonRpc.Server
                                             }
                                             else
                                             {
-                                                goto BuildRequestFailed;
+                                                goto BuildMessageFailed;
                                             }
                                         }
                                         else
                                         {
-                                            goto BuildRequestFailed;
+                                            goto BuildMessageFailed;
                                         }
                                     }
                                     else
                                     {
-                                        goto BuildRequestFailed;
+                                        goto BuildMessageFailed;
                                     }
                                 }
                             Method:
@@ -191,7 +191,7 @@ namespace RamType0.JsonRpc.Server
                                     }
                                     else
                                     {
-                                        goto BuildRequestFailed;
+                                        goto BuildMessageFailed;
                                     }
 
                                 }
@@ -205,7 +205,7 @@ namespace RamType0.JsonRpc.Server
                                     }
                                     else
                                     {
-                                        goto BuildRequestFailed;
+                                        goto BuildMessageFailed;
                                     }
 
                                 }
@@ -219,7 +219,7 @@ namespace RamType0.JsonRpc.Server
                                     }
                                     else
                                     {
-                                        goto BuildRequestFailed;
+                                        goto BuildMessageFailed;
                                     }
 
                                 }
@@ -237,13 +237,13 @@ namespace RamType0.JsonRpc.Server
                             case JsonToken.EndObject:
                                 goto ReachedObjectTerminal;
                             default:
-                                goto BuildRequestFailed;
+                                goto BuildMessageFailed;
                         }
                     }
                 }
                 catch (JsonParsingException)
                 {
-                    goto BuildRequestFailed;
+                    goto BuildMessageFailed;
                 }
             ReachedObjectTerminal:
                 if (versioned && methodName is EscapedUTF8String name)
@@ -261,15 +261,15 @@ namespace RamType0.JsonRpc.Server
                 }
                 else
                 {
-                    goto BuildRequestFailed;
+                    goto BuildMessageFailed;
                 }
             }
             else
             {
-                goto BuildRequestFailed;
+                goto BuildMessageFailed;
             }
 
-        BuildRequestFailed:
+        BuildMessageFailed:
             {
                 reader = new JsonReader(json.Array!, json.Offset);
                 try

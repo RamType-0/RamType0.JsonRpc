@@ -3,24 +3,24 @@
 namespace RamType0.JsonRpc.Server
 {
     public interface IParamsDeserializer<T>
-        where T : IMethodParams
+        where T :notnull
     {
         T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
     }
     public interface IArrayStyleParamsDeserializer<T> : IParamsDeserializer<T>
-        where T : struct, IMethodParams
+        where T : struct
     {
 
 
     }
     public interface IObjectStyleParamsDeserializer<T> : IParamsDeserializer<T>
-        where T : struct, IMethodParams
+        where T : struct
     {
 
     }
 
     public struct DefaultObjectStyleParamsDeserializer<T> : IObjectStyleParamsDeserializer<T>
-           where T : struct, IMethodParams
+           where T : struct
     {
         public T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
         {
@@ -28,7 +28,7 @@ namespace RamType0.JsonRpc.Server
         }
     }
     public readonly struct ParamsDeserializer<T, TObjectStyle, TArrayStyle> : IParamsDeserializer<T>
-        where T : struct, IMethodParams
+        where T : struct
         where TObjectStyle : struct, IObjectStyleParamsDeserializer<T>
         where TArrayStyle : struct, IArrayStyleParamsDeserializer<T>
     {
