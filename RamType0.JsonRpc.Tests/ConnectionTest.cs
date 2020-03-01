@@ -16,7 +16,7 @@ namespace RamType0.JsonRpc.Tests
         {
             a2b = new Pipe();
             b2a = new Pipe();
-            a = new Connection(new Server.Server(new PipeMessageOutput<PassThroughWriter>(new PassThroughWriter(), a2b.Writer)),new Client.Client());
+            //a = new Connection(new Server.Server(new PipeMessageOutput<PassThroughWriter>(new PassThroughWriter(), a2b.Writer)),new Client.Client());
         }
         public async ValueTask AwaitingRequest()
         {

@@ -13,6 +13,19 @@ namespace RamType0.JsonRpc.Internal
 {
     public abstract class RpcMethodEntry : IRpcMethodEntry
     {
+        public static RpcMethodEntry FromDelegate<T>(T d)
+            where T:notnull, Delegate
+        {
+            if (d.Method.IsStatic)
+            {
+                return RpcMethodEntryFactoryDelegateTypeCache<T>.StaticMethodFactory.CreateEntry(d);
+            }
+            else
+            {
+                return RpcMethodEntryFactoryDelegateTypeCache<T>.InstanceMethodFactory.CreateEntry(d);
+            }
+            
+        }
         public abstract ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver formatterResolver);
     }
     public class RpcMethodEntry<TMethod,TParams,TResult,TDeserializer,TModifier> : RpcMethodEntry
@@ -190,6 +203,13 @@ namespace RamType0.JsonRpc.Internal
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldfld, fpField);
                         il.EmitCalli(OpCodes.Calli, CallingConventions.Standard, methodResultType, parameterTypes, Type.EmptyTypes);
+                        if (methodResultType == typeof(void))
+                        {
+                            il.DeclareLocal(typeof(NullResult));
+                            il.Emit(OpCodes.Ldloca_S, (byte)0);
+                            il.Emit(OpCodes.Initobj);
+                            il.Emit(OpCodes.Ldloc_0);
+                        }
                         il.Emit(OpCodes.Ret);
                     }
                     tStaticMethodBody = builder.CreateTypeInfo()!;
@@ -217,6 +237,13 @@ namespace RamType0.JsonRpc.Internal
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldfld, fpField);
                         il.EmitCalli(OpCodes.Calli, CallingConventions.HasThis, methodResultType, parameterTypes, Type.EmptyTypes);
+                        if (methodResultType == typeof(void))
+                        {
+                            il.DeclareLocal(typeof(NullResult));
+                            il.Emit(OpCodes.Ldloca_S, (byte)0);
+                            il.Emit(OpCodes.Initobj);
+                            il.Emit(OpCodes.Ldloc_0);
+                        }
                         il.Emit(OpCodes.Ret);
                     }
                     tInstanceMethodBody = builder.CreateTypeInfo()!;
@@ -438,4 +465,6 @@ namespace RamType0.JsonRpc.Internal
             return new RpcMethodEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier);
         }
     }
+
+    
 }
