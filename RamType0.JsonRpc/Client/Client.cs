@@ -277,6 +277,7 @@ namespace RamType0.JsonRpc.Client
                         if (_error is ResponseError<object?> error)
                         {
                             UnIdentifiableErrors.Add(error);
+                            return false;
                         }
                         else
                         {

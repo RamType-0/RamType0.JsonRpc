@@ -5,6 +5,7 @@ using System.Reflection;
 namespace RamType0.JsonRpc.Internal
 {
     using Server;
+    using System.Runtime.CompilerServices;
     using Utf8Json;
 
     public delegate TResult ExplicitParamsFunc<TParams, TResult>(TParams parameters);
@@ -65,23 +66,26 @@ namespace RamType0.JsonRpc.Internal
         }
     }
 
-    public struct ExplicitParamsFuncDelegateInvoker<TParams, TResult> : IRpcMethodBody<TParams, TResult>,IDelegateContainer<ExplicitParamsFunc<TParams, TResult>>
+    public struct ExplicitParamsFuncDelegateInvoker<TParams, TResult> : IRpcMethodBody<TParams, TResult>,IDelegateContainer<Delegate>
     {
-        public ExplicitParamsFunc<TParams, TResult> Delegate { get; set; }
+        ExplicitParamsFunc<TParams, TResult> func;
+
+        public Delegate Delegate { set => func = Unsafe.As<ExplicitParamsFunc<TParams, TResult>>(value); }
 
         public TResult Invoke(TParams parameters)
         {
-            return Delegate(parameters);
+            return func(parameters);
         }
     }
 
-    public struct ExplicitParamsActionDelegateInvoker<TParams> : IRpcMethodBody<TParams, NullResult>, IDelegateContainer<ExplicitParamsAction<TParams>>
+    public struct ExplicitParamsActionDelegateInvoker<TParams> : IRpcMethodBody<TParams, NullResult>, IDelegateContainer<Delegate>
     {
-        public ExplicitParamsAction<TParams> Delegate { get; set; }
+        ExplicitParamsAction<TParams> action;
+        public Delegate Delegate { set => action = Unsafe.As<ExplicitParamsAction<TParams>>(value); }
 
         public NullResult Invoke(TParams parameters)
         {
-            Delegate(parameters);
+            action(parameters);
             return new NullResult();
         }
     }

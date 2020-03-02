@@ -3,9 +3,11 @@ using RamType0.JsonRpc.Server;
 using System;
 using System.Diagnostics;
 using System.IO.Pipelines;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using Utf8Json;
+using Utf8Json.Resolvers;
 
 namespace RamType0.JsonRpc.Tests
 {
@@ -334,5 +336,30 @@ namespace RamType0.JsonRpc.Tests
             var str = Encoding.UTF8.GetString(json);
         }
 
+        public struct Param
+        {
+            public int i;
+        }
+
+        [Test]
+        public void ExplicitParamsObjectFunc()
+        {
+            var entry = Internal.RpcEntry.ExplicitParams((Param p) => p.i);
+            var resolver = new Internal.RequestResolver();
+            resolver.TryRegister("Hello", entry);
+            var request = "{\"jsonrpc\":\"2.0\",\"params\":{\"i\":114514},\"method\":\"Hello\",\"id\":1}";
+            var json = resolver.Resolve(Encoding.UTF8.GetBytes(request));
+            var str = Encoding.UTF8.GetString(json);
+        }
+        [Test]
+        public void ExplicitParamsObjectAction()
+        {
+            var entry = Internal.RpcEntry.ExplicitParams((Param p) => { });
+            var resolver = new Internal.RequestResolver();
+            resolver.TryRegister("Hello", entry);
+            var request = "{\"jsonrpc\":\"2.0\",\"params\":{\"i\":114514},\"method\":\"Hello\",\"id\":1}";
+            var json = resolver.Resolve(Encoding.UTF8.GetBytes(request));
+            var str = Encoding.UTF8.GetString(json);
+        }
     }
 }

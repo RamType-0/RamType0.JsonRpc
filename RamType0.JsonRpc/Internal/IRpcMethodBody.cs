@@ -56,7 +56,7 @@ namespace RamType0.JsonRpc.Internal
 
     public interface IRpcEntry
     {
-        public ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver formatterResolver);
+        public ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver);
     }
     
 }

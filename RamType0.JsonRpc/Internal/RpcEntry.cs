@@ -1,5 +1,6 @@
 ﻿using RamType0.JsonRpc.Server;
 using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Utf8Json;
 namespace RamType0.JsonRpc.Internal
@@ -34,7 +35,10 @@ namespace RamType0.JsonRpc.Internal
             return RpcExplicitParamsFuncDelegateEntryFactory<TParams, TResult>.Instance.CreateEntry(explicitParamsFunc);
         }
 
-        public abstract ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver formatterResolver);
+        public abstract ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readFormatterResolver,IJsonFormatterResolver writeFormatterResolver);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readWriteFormatterResolver) => ResolveRequest(serializedParameters, id, readWriteFormatterResolver, readWriteFormatterResolver);
+
     }
     public class RpcEntry<TMethod,TParams,TResult,TDeserializer,TModifier> : RpcEntry
         where TMethod : notnull,IRpcMethodBody<TParams, TResult>
@@ -52,8 +56,8 @@ namespace RamType0.JsonRpc.Internal
             this.deserializer = deserializer;
             this.modifier = modifier;
         }
-
-        public override ArraySegment<byte> ResolveRequest(ArraySegment<byte> parametersSegment, ID? id,IJsonFormatterResolver formatterResolver)
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        public override ArraySegment<byte> ResolveRequest(ArraySegment<byte> parametersSegment, ID? id,IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver)
         {
 
             TParams parameters;
@@ -71,13 +75,13 @@ namespace RamType0.JsonRpc.Internal
 
             try
             {
-                parameters = deserializer.Deserialize(ref reader, formatterResolver);
+                parameters = deserializer.Deserialize(ref reader, readFormatterResolver);
             }
             catch (JsonParsingException)
             {
                 if (id is ID reqID)
                 {
-                    return JsonSerializer.SerializeUnsafe(ErrorResponse.InvalidParams(reqID, Encoding.UTF8.GetString(parametersSegment)), formatterResolver);
+                    return JsonSerializer.SerializeUnsafe(ErrorResponse.InvalidParams(reqID, Encoding.UTF8.GetString(parametersSegment)), writeFormatterResolver);
                 }
                 else
                 {
@@ -88,14 +92,18 @@ namespace RamType0.JsonRpc.Internal
             TResult result;
             try
             {
-                modifier.Modify(ref parameters,parametersSegment,id,formatterResolver);
+                modifier.Modify(ref parameters,parametersSegment,id,readFormatterResolver);
                 result = method.Invoke(parameters);
+            }
+            catch(RpcErrorException rpcError)
+            {
+                return rpcError.Response(parametersSegment, id, readFormatterResolver, writeFormatterResolver);
             }
             catch(Exception e)
             {
                 if(id is ID requestID)
                 {
-                    return JsonSerializer.SerializeUnsafe(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e));
+                    return JsonSerializer.SerializeUnsafe(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e),writeFormatterResolver);
                 }
                 else
                 {
@@ -108,11 +116,11 @@ namespace RamType0.JsonRpc.Internal
                 {
                     if(result is null)
                     {
-                        return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, new NullResult()), formatterResolver);
+                        return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, new NullResult()), writeFormatterResolver);
                     }
                     else
                     {
-                        return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, result), formatterResolver);
+                        return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, result), writeFormatterResolver);
                     }
                     
 
