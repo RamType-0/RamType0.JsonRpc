@@ -3,7 +3,6 @@
 namespace RamType0.JsonRpc.Server
 {
     public interface IParamsDeserializer<T>
-        where T :notnull
     {
         T Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver);
     }

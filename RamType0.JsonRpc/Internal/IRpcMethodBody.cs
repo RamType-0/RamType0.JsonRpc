@@ -26,14 +26,13 @@ namespace RamType0.JsonRpc.Internal
         public object Target { set; }
     }
 
-    public interface IMulticastDelegateContainer<in TDelegate>
+    public interface IDelegateContainer<in TDelegate>
         where TDelegate : notnull,Delegate
     {
         TDelegate Delegate { set; }
     }
 
     public interface IMethodParamsModifier<TParams>
-        where TParams :notnull
     {
         public void Modify(ref TParams parameters, ArraySegment<byte> parametersSegment, ID? id, IJsonFormatterResolver formatterResolver);
     }
