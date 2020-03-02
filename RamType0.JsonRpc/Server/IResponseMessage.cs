@@ -13,19 +13,19 @@ namespace RamType0.JsonRpc.Server
     public interface IErrorResponse : IResponseMessage
     {
         [DataMember(Name = "error")]
-        ErrorObject Error { get; set; }
+        ResponseError Error { get; set; }
     }
 
     public interface IErrorResponse<T> : IErrorResponse
         where T : notnull
     {
         [DataMember(Name = "error")]
-        new ErrorObject<T> Error { get; set; }
-        ErrorObject IErrorResponse.Error
+        new ResponseError<T> Error { get; set; }
+        ResponseError IErrorResponse.Error
         {
             get
             {
-                return new ErrorObject(Error.Code, Error.Message);
+                return new ResponseError(Error.Code, Error.Message);
             }
 
             set
@@ -38,19 +38,15 @@ namespace RamType0.JsonRpc.Server
         }
     }
 
-    interface IResultResponse<out T> : IResultResponse
+    interface IResultResponse<out T> : IResponseMessage
     {
         [DataMember(Name = "result")]
         T Result { get; }
         //object? IResultResponse.result => result;
     }
 
-    interface IResultResponse : IResponseMessage
-    {
-        //object? result { get; }
-    }
 
-    interface IErrorObject
+    interface IResponseError
     {
         [DataMember(Name = "code")]
         public long Code { get; set; }
@@ -58,11 +54,6 @@ namespace RamType0.JsonRpc.Server
         public string Message { get; set; }
     }
 
-    interface IErrorObject<out T> : IErrorObject
-    {
-        [DataMember(Name = "data")]
-        T Data { get; }
-    }
 
     /// <summary>
     /// 戻り値を持ったJsonRpcメソッドが正常に完了した際の応答を示します。
@@ -128,15 +119,15 @@ namespace RamType0.JsonRpc.Server
         [DataMember(Name = "id")]
         public ID? ID { get; set; }
         [DataMember(Name = "error")]
-        public ErrorObject<T> Error { get; set; }
+        public ResponseError<T> Error { get; set; }
 
-        public ErrorResponse(ID? id, ErrorObject<T> error) : this()
+        public ErrorResponse(ID? id, ResponseError<T> error) : this()
         {
             this.ID = id;
             this.Error = error;
         }
     }
-    public struct ErrorObject<T> : IErrorObject<T>
+    public struct ResponseError<T>
         where T : notnull
     {
         [DataMember(Name = "code")]
@@ -146,13 +137,13 @@ namespace RamType0.JsonRpc.Server
         [DataMember(Name = "data")]
         public T Data { get; set; }
 
-        public ErrorObject(ErrorCode code, string message, T data)
+        public ResponseError(ErrorCode code, string message, T data)
         {
             this.Code = (long)code;
             this.Message = message;
             this.Data = data;
         }
-        public ErrorObject(long errorCode, string message, T data) : this((ErrorCode)errorCode, message, data)
+        public ResponseError(long errorCode, string message, T data) : this((ErrorCode)errorCode, message, data)
         {
 
         }
@@ -165,44 +156,44 @@ namespace RamType0.JsonRpc.Server
         [DataMember(Name = "id")]
         public ID? ID { get; set; }
         [DataMember(Name = "error")]
-        public ErrorObject Error { get; set; }
+        public ResponseError Error { get; set; }
 
-        public ErrorResponse(ID? id, ErrorObject error) : this()
+        public ErrorResponse(ID? id, ResponseError error) : this()
         {
             this.ID = id;
             this.Error = error;
         }
         public static ErrorResponse<Exception> Exception(ID requestID, ErrorCode errorCode, Exception exception)
         {
-            return new ErrorResponse<Exception>(requestID, ErrorObject.Exception(errorCode, exception));
+            return new ErrorResponse<Exception>(requestID, ResponseError.Exception(errorCode, exception));
         }
 
         public static ErrorResponse<Exception> Exception(ID requestID, long errorCode, Exception exception)
         {
-            return new ErrorResponse<Exception>(requestID, ErrorObject.Exception(errorCode, exception));
+            return new ErrorResponse<Exception>(requestID, ResponseError.Exception(errorCode, exception));
         }
         public static ErrorResponse<Exception> ParseError(Exception e)
         {
-            return new ErrorResponse<Exception>(null, ErrorObject.Exception(ErrorCode.ParseError, e));
+            return new ErrorResponse<Exception>(null, ResponseError.Exception(ErrorCode.ParseError, e));
         }
 
         public static ErrorResponse ParseError(ArraySegment<byte> json)
         {
-            return new ErrorResponse(null, new ErrorObject(ErrorCode.ParseError, Encoding.UTF8.GetString(json)));
+            return new ErrorResponse(null, new ResponseError(ErrorCode.ParseError, Encoding.UTF8.GetString(json)));
         }
         public static ErrorResponse MethodNotFound(ID requestID, string methodName)
         {
-            return new ErrorResponse(requestID, new ErrorObject(ErrorCode.MethodNotFound, $"The method you wanted to invoke not found. Assigned name:{methodName}"));
+            return new ErrorResponse(requestID, new ResponseError(ErrorCode.MethodNotFound, $"The method you wanted to invoke not found. Assigned name:{methodName}"));
         }
         public static ErrorResponse InvalidParams(ID requestID, string paramsJson)
         {
-            return new ErrorResponse(requestID, new ErrorObject(ErrorCode.InvalidParams, $"The params of request object was invalid. Assigned params:{paramsJson}"));
+            return new ErrorResponse(requestID, new ResponseError(ErrorCode.InvalidParams, $"The params of request object was invalid. Assigned params:{paramsJson}"));
         }
 
 
         public static ErrorResponse InvalidRequest(string requestJson)
         {
-            return new ErrorResponse(null, new ErrorObject(ErrorCode.InvalidRequest, $"The request object was invalid. Assigned request:{requestJson}"));
+            return new ErrorResponse(null, new ResponseError(ErrorCode.InvalidRequest, $"The request object was invalid. Assigned request:{requestJson}"));
         }
 
         public static ErrorResponse InvalidRequest(ArraySegment<byte> json)
@@ -211,27 +202,27 @@ namespace RamType0.JsonRpc.Server
         }
 
     }
-    public struct ErrorObject : IErrorObject
+    public struct ResponseError : IResponseError
     {
         [DataMember(Name = "code")]
         public long Code { get; set; }
         [DataMember(Name = "message")]
         public string Message { get; set; }
 
-        public ErrorObject(ErrorCode code, string message)
+        public ResponseError(ErrorCode code, string message)
         {
             this.Code = (long)code;
             this.Message = message;
         }
-        public ErrorObject(long errorCode, string message) : this((ErrorCode)errorCode, message)
+        public ResponseError(long errorCode, string message) : this((ErrorCode)errorCode, message)
         {
 
         }
-        public static ErrorObject<Exception> Exception(ErrorCode errorCode, Exception exception)
+        public static ResponseError<Exception> Exception(ErrorCode errorCode, Exception exception)
         {
-            return new ErrorObject<Exception>(errorCode, exception.Message, exception);
+            return new ResponseError<Exception>(errorCode, exception.Message, exception);
         }
-        public static ErrorObject<Exception> Exception(long errorCode, Exception exception)
+        public static ResponseError<Exception> Exception(long errorCode, Exception exception)
         {
             return Exception((ErrorCode)errorCode, exception);
         }

@@ -20,7 +20,7 @@ namespace RamType0.JsonRpc.Internal
     internal static class RpcEntryFactoryCache<TDelegate>
         where TDelegate : notnull, Delegate
     {
-        public static MethodInfo DelegateInvokeMethodInfo { get; } = typeof(TDelegate).GetMethod("Invoke")!;
+        public static MethodInfo DelegateInvokeMethodInfo { get; }
 
         public static Type TParams { get; }
         public static Type TResult { get; }
@@ -33,7 +33,12 @@ namespace RamType0.JsonRpc.Internal
         public static Type DelegateResultType { get; }
         static RpcEntryFactoryCache()
         {
-            var methodInfo = DelegateInvokeMethodInfo;
+            var methodInfo = typeof(TDelegate).GetMethod("Invoke");
+            if(methodInfo is null)
+            {
+                throw new ArgumentException($"{typeof(TDelegate)} does not have Invoke method.");
+            }
+            DelegateInvokeMethodInfo = methodInfo;
             var methodParameters = methodInfo.GetParameters();
             var methodResultType = methodInfo.ReturnType;
             DelegateResultType = methodResultType;
