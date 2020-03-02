@@ -26,8 +26,8 @@ namespace RamType0.JsonRpc.Internal
         public object Target { set; }
     }
 
-    public interface IMulticastDelegateContainer<TDelegate>
-        where TDelegate : notnull,MulticastDelegate
+    public interface IMulticastDelegateContainer<in TDelegate>
+        where TDelegate : notnull,Delegate
     {
         TDelegate Delegate { set; }
     }
