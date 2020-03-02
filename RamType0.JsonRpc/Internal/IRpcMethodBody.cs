@@ -26,6 +26,11 @@ namespace RamType0.JsonRpc.Internal
         public object Target { set; }
     }
 
+    public interface IMulticastDelegateContainer<TDelegate>
+        where TDelegate : notnull,MulticastDelegate
+    {
+        TDelegate Delegate { set; }
+    }
 
     public interface IMethodParamsModifier<TParams>
         where TParams :notnull
@@ -50,7 +55,7 @@ namespace RamType0.JsonRpc.Internal
         }
     }
 
-    public interface IRpcMethodEntry
+    public interface IRpcEntry
     {
         public ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver formatterResolver);
     }

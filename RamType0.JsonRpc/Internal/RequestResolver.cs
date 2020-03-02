@@ -13,7 +13,7 @@ namespace RamType0.JsonRpc.Internal
 {
     public sealed class RequestResolver
     {
-        internal ConcurrentDictionary<EscapedUTF8String, RpcMethodEntry> RpcMethods { get; set; } = new ConcurrentDictionary<EscapedUTF8String, RpcMethodEntry>();
+        internal ConcurrentDictionary<EscapedUTF8String, RpcEntry> RpcMethods { get; set; } = new ConcurrentDictionary<EscapedUTF8String, RpcEntry>();
         
         [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
         public ReadOnlySpan<byte> Resolve(ArraySegment<byte> json,IJsonFormatterResolver formatterResolver)
@@ -283,14 +283,14 @@ namespace RamType0.JsonRpc.Internal
             return result;
         }
         public ReadOnlySpan<byte> Resolve(string json) => Resolve(json, JsonSerializer.DefaultResolver);
-        public bool TryRegister(string name, RpcMethodEntry rpcMethod)
+        public bool TryRegister(string name, RpcEntry rpcMethod)
         {
             var methodName = EscapedUTF8String.FromUnEscaped(name);
             return RpcMethods.TryAdd(methodName, rpcMethod);
         }
 
         
-        public bool TryUnregister(string name,[NotNullWhen(true)] out RpcMethodEntry? unregistered)
+        public bool TryUnregister(string name,[NotNullWhen(true)] out RpcEntry? unregistered)
         {
             var methodName = EscapedUTF8String.FromUnEscaped(name);
             return RpcMethods.TryRemove(methodName,out unregistered);
