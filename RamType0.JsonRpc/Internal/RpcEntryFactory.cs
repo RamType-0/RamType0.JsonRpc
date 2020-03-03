@@ -15,7 +15,7 @@ namespace RamType0.JsonRpc.Internal
     internal abstract class RpcEntryFactory<T>
    where T : notnull, Delegate
     {
-        public abstract RpcEntry CreateEntry(T d);
+        public abstract RpcEntry CreateEntry(T d, IExceptionHandler exceptionHandler);
     }
     internal static class RpcEntryFactoryCache<TDelegate>
         where TDelegate : notnull, Delegate
@@ -539,12 +539,12 @@ namespace RamType0.JsonRpc.Internal
 
 
 
-        public override RpcEntry CreateEntry(TDelegate d)
+        public override RpcEntry CreateEntry(TDelegate d,IExceptionHandler exceptionHandler)
         {
             var method = this.method;
             method.FunctionPointer = d.Method.MethodHandle.GetFunctionPointer();
             method.Target = d.Target!;
-            return new RpcEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier);
+            return new RpcEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier,exceptionHandler);
         }
     }
 
@@ -561,11 +561,11 @@ namespace RamType0.JsonRpc.Internal
 
 
 
-        public override RpcEntry CreateEntry(TDelegate d)
+        public override RpcEntry CreateEntry(TDelegate d,IExceptionHandler exceptionHandler)
         {
             var method = this.method;
             method.FunctionPointer = d.Method.MethodHandle.GetFunctionPointer();
-            return new RpcEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier);
+            return new RpcEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier,exceptionHandler);
         }
     }
 
@@ -579,11 +579,11 @@ namespace RamType0.JsonRpc.Internal
         internal TMethod method;
         internal TDeserializer deserializer;
         internal TModifier modifier;
-        public override RpcEntry CreateEntry(TDelegate d)
+        public override RpcEntry CreateEntry(TDelegate d,IExceptionHandler exceptionHandler)
         {
             var method = this.method;
             method.Delegate = d;
-            return new RpcEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier);
+            return new RpcEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier,exceptionHandler);
         }
     }
 }

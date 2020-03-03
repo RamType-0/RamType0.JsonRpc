@@ -7,38 +7,42 @@ namespace RamType0.JsonRpc.Internal
 {
     public abstract class RpcEntry : IRpcEntry
     {
-        public static RpcEntry FromDelegate<T>(T d)
+        public static RpcEntry FromDelegate<T>(T d) where T : notnull, Delegate => FromDelegate(d, StandardExceptionHandler.Instance);
+        public static RpcEntry FromDelegate<T>(T d,IExceptionHandler exceptionHandler)
             where T:notnull, Delegate
         {
             if (d is MulticastDelegate multicast && multicast.GetInvocationList().Length > 1)
             {
-                return RpcDelegateEntryFactory<T>.Instance.CreateEntry(d);
+                return RpcDelegateEntryFactory<T>.Instance.CreateEntry(d,exceptionHandler);
             }
             else if (d.Method.IsStatic)
             {
-                return RpcStaticMethodEntryFactory<T>.Instance.CreateEntry(d);
+                return RpcStaticMethodEntryFactory<T>.Instance.CreateEntry(d,exceptionHandler);
             }
             else
             {
-                return RpcInstanceMethodEntryFactory<T>.Instance.CreateEntry(d);
+                return RpcInstanceMethodEntryFactory<T>.Instance.CreateEntry(d,exceptionHandler);
             }
             
         }
 
-        public static RpcEntry ExplicitParams<TParams>(ExplicitParamsAction<TParams> explicitParamsAction)
+        public static RpcEntry ExplicitParams<TParams>(ExplicitParamsAction<TParams> explicitParamsAction) => ExplicitParams(explicitParamsAction, StandardExceptionHandler.Instance);
+
+        public static RpcEntry ExplicitParams<TParams>(ExplicitParamsAction<TParams> explicitParamsAction, IExceptionHandler exceptionHandler)
         {
-            return RpcExplicitParamsActionDelegateEntryFactory<TParams>.Instance.CreateEntry(explicitParamsAction);
+            return RpcExplicitParamsActionDelegateEntryFactory<TParams>.Instance.CreateEntry(explicitParamsAction,exceptionHandler);
         }
 
-        public static RpcEntry ExplicitParams<TParams,TResult>(ExplicitParamsFunc<TParams,TResult> explicitParamsFunc)
+        public static RpcEntry ExplicitParams<TParams, TResult>(ExplicitParamsFunc<TParams, TResult> explicitParamsFunc) => ExplicitParams(explicitParamsFunc, StandardExceptionHandler.Instance);
+
+        public static RpcEntry ExplicitParams<TParams,TResult>(ExplicitParamsFunc<TParams,TResult> explicitParamsFunc, IExceptionHandler exceptionHandler)
         {
-            return RpcExplicitParamsFuncDelegateEntryFactory<TParams, TResult>.Instance.CreateEntry(explicitParamsFunc);
+            return RpcExplicitParamsFuncDelegateEntryFactory<TParams, TResult>.Instance.CreateEntry(explicitParamsFunc,exceptionHandler);
         }
 
         public abstract ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readFormatterResolver,IJsonFormatterResolver writeFormatterResolver);
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readWriteFormatterResolver) => ResolveRequest(serializedParameters, id, readWriteFormatterResolver, readWriteFormatterResolver);
-
     }
     public class RpcEntry<TMethod,TParams,TResult,TDeserializer,TModifier> : RpcEntry
         where TMethod : notnull,IRpcMethodBody<TParams, TResult>
@@ -50,11 +54,14 @@ namespace RamType0.JsonRpc.Internal
         internal TDeserializer deserializer;
         internal TModifier modifier;
 
-        public RpcEntry(TMethod method, TDeserializer deserializer, TModifier modifier)
+        public IExceptionHandler ExceptionHandler { get; set; }
+
+        public RpcEntry(TMethod method, TDeserializer deserializer, TModifier modifier,IExceptionHandler exceptionHandler)
         {
             this.method = method;
             this.deserializer = deserializer;
             this.modifier = modifier;
+            ExceptionHandler = exceptionHandler;
         }
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public override ArraySegment<byte> ResolveRequest(ArraySegment<byte> parametersSegment, ID? id,IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver)
@@ -95,20 +102,9 @@ namespace RamType0.JsonRpc.Internal
                 modifier.Modify(ref parameters,parametersSegment,id,readFormatterResolver);
                 result = method.Invoke(parameters);
             }
-            catch(RpcErrorException rpcError)
-            {
-                return rpcError.Response(parametersSegment, id, readFormatterResolver, writeFormatterResolver);
-            }
             catch(Exception e)
             {
-                if(id is ID requestID)
-                {
-                    return JsonSerializer.SerializeUnsafe(ErrorResponse.Exception(requestID, ErrorCode.InternalError, e),writeFormatterResolver);
-                }
-                else
-                {
-                    return ArraySegment<byte>.Empty;
-                }
+                return ExceptionHandler.Handle(e, parametersSegment, id, readFormatterResolver, writeFormatterResolver);
                 
             }
             {

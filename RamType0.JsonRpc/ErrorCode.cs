@@ -14,7 +14,7 @@
         UnknownErrorCode = -32001,
 
         // Defined by the language server protocol.
-        //RequestCancelled = -32800,
+        RequestCancelled = -32800,
         //ContentModified = -32801,
     }
 }

@@ -8,10 +8,10 @@ namespace RamType0.JsonRpc.Internal
 {
 
     [Serializable]
-    public abstract class RpcErrorException : Exception
+    public abstract class RpcExplicitResponseException : Exception
     {
         public RpcResponse Response { get; }
-        public RpcErrorException(RpcResponse response) 
+        public RpcExplicitResponseException(RpcResponse response) 
         {
             this.Response = response;
         }
