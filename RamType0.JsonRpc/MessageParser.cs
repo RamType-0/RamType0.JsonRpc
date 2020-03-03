@@ -18,7 +18,7 @@ namespace RamType0.JsonRpc
     {
         public static MessageParseResult ParseDuplexMessage(ArraySegment<byte> message)
         {
-            var duplexMessage = new MessageParseResult();
+            var parseResult = new MessageParseResult();
             var reader = new JsonReader(message.Array!, message.Offset);
             if (reader.ReadIsBeginObject())
             {
@@ -178,7 +178,7 @@ namespace RamType0.JsonRpc
                                             if ((Unsafe.ReadUnaligned<ulong>(ref Unsafe.AddByteOffset(ref bufferRef, (IntPtr)(-3))) & 0xFFFFFFFFFF000000) == ___2_0)
                                             {
                                                 reader.AdvanceOffset(5);
-                                                duplexMessage[MessagePropertyKind.JsonRpcVersion] = PropertyState.Valid;
+                                                parseResult[MessagePropertyKind.JsonRpcVersion] = PropertyState.Valid;
                                                 break;
                                             }
                                             else
@@ -203,14 +203,14 @@ namespace RamType0.JsonRpc
                                     {
                                         try
                                         {
-                                            duplexMessage.Method = EscapedUTF8String.FromEscapedNonQuoted(reader.ReadStringSegmentRaw());
+                                            parseResult.Method = EscapedUTF8String.FromEscapedNonQuoted(reader.ReadStringSegmentRaw());
                                         }
                                         catch (JsonParsingException)
                                         {
-                                            duplexMessage[MessagePropertyKind.Method] = PropertyState.Invalid;
+                                            parseResult[MessagePropertyKind.Method] = PropertyState.Invalid;
                                             goto UnExpectedFormatProperty;
                                         }
-                                        duplexMessage[MessagePropertyKind.Method] = PropertyState.Valid;
+                                        parseResult[MessagePropertyKind.Method] = PropertyState.Valid;
                                         break;
                                     }
                                     else
@@ -226,14 +226,14 @@ namespace RamType0.JsonRpc
                                     {
                                         try
                                         {
-                                            duplexMessage.Params = reader.ReadNextBlockSegment();
+                                            parseResult.Params = reader.ReadNextBlockSegment();
                                         }
                                         catch (JsonParsingException)
                                         {
-                                            duplexMessage[MessagePropertyKind.Params] = PropertyState.Invalid;
+                                            parseResult[MessagePropertyKind.Params] = PropertyState.Invalid;
                                             goto UnExpectedFormatProperty;
                                         }
-                                        duplexMessage[MessagePropertyKind.Params] = PropertyState.Valid;
+                                        parseResult[MessagePropertyKind.Params] = PropertyState.Valid;
                                         break;
                                     }
                                     else
@@ -249,14 +249,14 @@ namespace RamType0.JsonRpc
                                     {
                                         try
                                         {
-                                            duplexMessage.id = ID.Formatter.DeserializeSafe(ref reader);
+                                            parseResult.id = ID.Formatter.DeserializeSafe(ref reader);
                                         }
                                         catch (JsonParsingException)
                                         {
-                                            duplexMessage[MessagePropertyKind.ID] = PropertyState.Invalid;
+                                            parseResult[MessagePropertyKind.ID] = PropertyState.Invalid;
                                             goto UnExpectedFormatProperty;
                                         }
-                                        duplexMessage[MessagePropertyKind.ID] = PropertyState.Valid;
+                                        parseResult[MessagePropertyKind.ID] = PropertyState.Valid;
                                         break;
                                     }
                                     else
@@ -272,14 +272,14 @@ namespace RamType0.JsonRpc
                                     {
                                         try
                                         {
-                                            duplexMessage.Result = reader.ReadNextBlockSegment();
+                                            parseResult.Result = reader.ReadNextBlockSegment();
                                         }
                                         catch (JsonParsingException)
                                         {
-                                            duplexMessage[MessagePropertyKind.Result] = PropertyState.Invalid;
+                                            parseResult[MessagePropertyKind.Result] = PropertyState.Invalid;
                                             goto UnExpectedFormatProperty;
                                         }
-                                        duplexMessage[MessagePropertyKind.Result] = PropertyState.Valid;
+                                        parseResult[MessagePropertyKind.Result] = PropertyState.Valid;
                                         break;
                                     }
                                     else
@@ -295,14 +295,14 @@ namespace RamType0.JsonRpc
                                     {
                                         try
                                         {
-                                            duplexMessage.Error = reader.ReadNextBlockSegment(); //Client.JsonResolver.GetFormatterWithVerify<Client.ResponseError<object?>>().Deserialize(ref reader, Client.JsonResolver);
+                                            parseResult.Error = reader.ReadNextBlockSegment(); //Client.JsonResolver.GetFormatterWithVerify<Client.ResponseError<object?>>().Deserialize(ref reader, Client.JsonResolver);
                                         }
                                         catch (JsonParsingException)
                                         {
-                                            duplexMessage[MessagePropertyKind.Error] = PropertyState.Invalid;
+                                            parseResult[MessagePropertyKind.Error] = PropertyState.Invalid;
                                             goto UnExpectedFormatProperty;
                                         }
-                                        duplexMessage[MessagePropertyKind.Error] = PropertyState.Valid;
+                                        parseResult[MessagePropertyKind.Error] = PropertyState.Valid;
                                         break;
                                     }
                                     else
@@ -312,7 +312,7 @@ namespace RamType0.JsonRpc
                                 }
                             UnknownProperty:
                                 {
-                                    duplexMessage.State |= MessageParseInfos.HasUnknownProperty;
+                                    parseResult.Infos |= MessageParseInfos.HasUnknownProperty;
                                     try
                                     {
                                         reader.ReadStringSegmentRaw();
@@ -364,7 +364,7 @@ namespace RamType0.JsonRpc
                                 }
                             case JsonToken.EndObject:
                                 {
-                                    return duplexMessage;
+                                    return parseResult;
                                 }
                                 
                             default:
@@ -407,14 +407,14 @@ namespace RamType0.JsonRpc
 
         NotAObject:
             {
-                duplexMessage.State |= MessageParseInfos.IsNotAObject;
+                parseResult.Infos |= MessageParseInfos.IsNotAObject;
             }
 
         InvalidJson:
             {
-                duplexMessage.State |= MessageParseInfos.HasParseError;
+                parseResult.Infos |= MessageParseInfos.HasParseError;
             }
-            return duplexMessage;
+            return parseResult;
 
         }
         public sealed class SegmentExtractFormatter : IJsonFormatter<ArraySegment<byte>>
@@ -443,7 +443,7 @@ namespace RamType0.JsonRpc
         const byte MessageStateSize = 4;
 
 
-        public MessageParseInfos State
+        public MessageParseInfos Infos
         {
             get
             {
