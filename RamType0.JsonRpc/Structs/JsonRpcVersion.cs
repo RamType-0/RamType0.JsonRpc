@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Utf8Json;
 namespace RamType0.JsonRpc
 {
@@ -39,7 +41,30 @@ namespace RamType0.JsonRpc
 
             private static bool ReadIsVersion2(ref JsonReader reader)
             {
-                return reader.ReadStringSegmentRaw().AsSpan().SequenceEqual(stackalloc byte[] { (byte)'2', (byte)'.', (byte)'0' });
+                reader.SkipWhiteSpace();
+                var span = reader.GetBufferUnsafe().AsSpan(reader.GetCurrentOffsetUnsafe());
+                switch (span.Length)
+                {
+                    case 0:
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4:
+                        return false;
+                    default:
+                        {
+                            ref var spanRef = ref MemoryMarshal.GetReference(span);
+                            if(Unsafe.ReadUnaligned<uint>(ref spanRef) == (('"') | ('2' << 8) | ('.' << 16) | ('0' << 24)) && Unsafe.AddByteOffset(ref spanRef,(IntPtr)4) == (byte)'"')
+                            {
+                                reader.AdvanceOffset(5);
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
+                        }
+                }
             }
 
             public void Serialize(ref JsonWriter writer, JsonRpcVersion value, IJsonFormatterResolver formatterResolver)
@@ -57,9 +82,7 @@ namespace RamType0.JsonRpc
             {
                 throw new JsonParsingException($"Invalid version of JsonRpc. Expected:\"2.0\" Actual : \"{actualValue}\"");
             }
-            /// <summary>
-            /// Deserializeを通じて正しい
-            /// </summary>
+
             public sealed class Nullable : IJsonFormatter<JsonRpcVersion?>
             {
                 public JsonRpcVersion? Deserialize(ref JsonReader reader, IJsonFormatterResolver formatterResolver)
@@ -70,8 +93,16 @@ namespace RamType0.JsonRpc
                     }
                     else
                     {
-                        ReadIsVersion2WithVerify(ref reader);
-                        return default(JsonRpcVersion);
+                        if(ReadIsVersion2(ref reader))
+                        {
+                            return new JsonRpcVersion();
+                        }
+                        else
+                        {
+                            reader.ReadNextBlock();
+                            return null;
+                        }
+                        
                     }
                 }
 
