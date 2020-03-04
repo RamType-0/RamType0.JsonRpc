@@ -22,7 +22,6 @@ namespace RamType0.JsonRpc
             var reader = new JsonReader(message.Array!, message.Offset);
             if (reader.ReadIsBeginObject())
             {
-                
                 try
                 {
                     while (true)
@@ -312,7 +311,7 @@ namespace RamType0.JsonRpc
                                 }
                             UnknownProperty:
                                 {
-                                    parseResult.Infos |= MessageParseInfos.HasUnknownProperty;
+                                    parseResult.ParseErrors |= MessageParseErrors.HasUnknownProperty;
                                     try
                                     {
                                         reader.ReadStringSegmentRaw();
@@ -342,6 +341,7 @@ namespace RamType0.JsonRpc
                                 }
                             UnExpectedFormatProperty:
                                 {
+                                    parseResult.ParseErrors = MessageParseErrors.HasInvalidProperty;
                                     try
                                     {
                                         reader.ReadNextBlock();
@@ -407,12 +407,12 @@ namespace RamType0.JsonRpc
 
         NotAObject:
             {
-                parseResult.Infos |= MessageParseInfos.IsNotAObject;
+                parseResult.ParseErrors |= MessageParseErrors.IsNotAObject;
             }
 
         InvalidJson:
             {
-                parseResult.Infos |= MessageParseInfos.HasParseError;
+                parseResult.ParseErrors |= MessageParseErrors.IsInvalidJson;
             }
             return parseResult;
 
@@ -433,54 +433,40 @@ namespace RamType0.JsonRpc
             }
         }
     }
-
-    [StructLayout(LayoutKind.Auto)]
-    public struct MessageParseResult
+    public unsafe struct MessageParseResult
     {
-        uint bits;
-        const byte PropertyStateSize = 2;
-        const uint PropertyStateMask = (1 << PropertyStateSize) - 1;
-        const byte MessageStateSize = 4;
-
-
-        public MessageParseInfos Infos
+        fixed byte props[8];
+        internal ref ulong Bits
         {
             get
             {
-                return (MessageParseInfos)(bits >> (32 - MessageStateSize));
-            }
-            set
-            {
-                const uint Mask = (uint)((1 << MessageStateSize) - 1) << (32 - MessageStateSize);
-                bits = (bits & ~Mask) | (uint)value << (32 - MessageStateSize);
+                return ref Unsafe.As<byte, ulong>(ref props[0]);
             }
         }
 
+        public ref MessageParseErrors ParseErrors
+        {
+            get
+            {
+                return ref Unsafe.As<byte,MessageParseErrors>(ref props[7]);
+            }
+
+        }
+
+        public bool HasParseError => ParseErrors != 0;
+        public bool IsValidRequest =>        (Bits & 0x000001FFFFFF) == 0x000000020202;
+        public bool IsValidNotification =>   (Bits & 0x000001FFFFFF) == 0x000000020002;
+        public bool IsValidResultResponse => (Bits & 0xFFFF0000FFFF) == 0x000200000202;
+        public bool IsValidErrorResponse =>  (Bits & 0xFFFF0000FFFF) == 0x020000000202;
         public PropertyState this[MessagePropertyKind propertyKind]
         {
             get
             {
-                return (PropertyState)BitFieldExtract(bits, (byte)propertyKind);
+                return (PropertyState)props[(byte)propertyKind];
             }
             set
             {
-                var mask = PropertyStateMask << (int)propertyKind;
-                bits = (bits & ~mask) | (uint)value << (int)propertyKind;
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static uint BitFieldExtract(uint value, byte start)
-        {
-
-            if (Bmi1.IsSupported)
-            {
-                return Bmi1.BitFieldExtract(value, start, PropertyStateSize);
-            }
-            else
-            {
-                var mask = PropertyStateMask << start;
-                return (value & mask) >> start;
+                props[(byte)propertyKind] = (byte)value;
             }
         }
         //[DataMember(Name = "jsonrpc")]
@@ -516,8 +502,6 @@ namespace RamType0.JsonRpc
         
         
     }
-
-
     public enum MessagePropertyKind
     {
         JsonRpcVersion,
@@ -529,18 +513,19 @@ namespace RamType0.JsonRpc
 
     }
 
-    public enum PropertyState
+    public enum PropertyState :byte
     {
         Missing,
         Invalid,
         Valid,
     }
     [Flags]
-    public enum MessageParseInfos
+    public enum MessageParseErrors : byte
     {
         HasUnknownProperty = 1,
         IsNotAObject = 2,
-        HasParseError = 4
+        IsInvalidJson = 4,
+        HasInvalidProperty = 8,
 
     }
 

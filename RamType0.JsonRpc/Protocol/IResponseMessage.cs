@@ -46,15 +46,6 @@ namespace RamType0.JsonRpc.Server
     }
 
 
-    interface IResponseError
-    {
-        [DataMember(Name = "code")]
-        public long Code { get; set; }
-        [DataMember(Name = "message")]
-        public string Message { get; set; }
-    }
-
-
     /// <summary>
     /// 戻り値を持ったJsonRpcメソッドが正常に完了した際の応答を示します。
     /// </summary>
@@ -202,7 +193,7 @@ namespace RamType0.JsonRpc.Server
         }
 
     }
-    public struct ResponseError : IResponseError
+    public struct ResponseError
     {
         [DataMember(Name = "code")]
         public long Code { get; set; }
