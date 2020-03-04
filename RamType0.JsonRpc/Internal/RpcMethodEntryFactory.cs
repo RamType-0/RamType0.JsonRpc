@@ -11,27 +11,27 @@ using Utf8Json;
 namespace RamType0.JsonRpc.Internal
 {
     using static Emit;
-    using static RpcEntryFactoryHelper;
-    internal abstract class RpcEntryFactory<T>
+    using static RpcMethodEntryFactoryHelper;
+    internal abstract class RpcMethodEntryFactory<T>
    where T : notnull, Delegate
     {
-        public abstract RpcEntry CreateEntry(T d, IExceptionHandler exceptionHandler);
+        public abstract RpcMethodEntry CreateEntry(T d, IExceptionHandler exceptionHandler);
     }
-    internal static class RpcEntryFactoryCache<TDelegate>
+    internal static class RpcMethodEntryFactoryCache<TDelegate>
         where TDelegate : notnull, Delegate
     {
         public static MethodInfo DelegateInvokeMethodInfo { get; }
 
         public static Type TParams { get; }
         public static Type TResult { get; }
+        public static Type ReturnType { get; }
         public static Type TDeserializer { get; }
         public static Type TModifier { get; }
         public static Type IRpcMethodBodyType { get; }
         public static MethodInfo IRpcMethodInvokeMethodInfo { get; }
         public static Type[] DelegateInvokeParameterTypes { get; }
         public static FieldInfo[] ParameterFields { get; }
-        public static Type DelegateResultType { get; }
-        static RpcEntryFactoryCache()
+        static RpcMethodEntryFactoryCache()
         {
             var methodInfo = typeof(TDelegate).GetMethod("Invoke");
             if(methodInfo is null)
@@ -40,10 +40,9 @@ namespace RamType0.JsonRpc.Internal
             }
             DelegateInvokeMethodInfo = methodInfo;
             var methodParameters = methodInfo.GetParameters();
-            var methodResultType = methodInfo.ReturnType;
-            DelegateResultType = methodResultType;
-            var tResult = methodResultType == typeof(void) ? typeof(NullResult) : methodResultType;
-            TResult = tResult;
+            var returnType = methodInfo.ReturnType;
+            ReturnType = returnType;
+            TResult = returnType == typeof(void) ? typeof(NullResult) : returnType;
             var (tParams, parameters, serializedParameters, idInjectField) = CreateParamsType(methodInfo, methodParameters);
             TParams = tParams;
             ParameterFields = parameters;
@@ -74,10 +73,22 @@ namespace RamType0.JsonRpc.Internal
 
 
             {
-                var type2 = TypeArray2;
-                type2[0] = tParams;
-                type2[1] = tResult;
-                var iMethodBodyType = typeof(IRpcMethodBody<,>).MakeGenericType(type2);
+                Type iMethodBodyType;
+                if(returnType == typeof(void))
+                {
+                    var type1 = TypeArray1;
+                    type1[0] = tParams;
+                    iMethodBodyType = typeof(IRpcMethodBody<>).MakeGenericType(type1);
+                }
+                else
+                {
+                    var type2 = TypeArray2;
+                    type2[0] = tParams;
+                    type2[1] = returnType;
+                    iMethodBodyType = typeof(IRpcMethodBody<,>).MakeGenericType(type2);
+
+                }
+
 
                 IRpcMethodBodyType = iMethodBodyType;
                 var invokeMethodToOverride = iMethodBodyType.GetMethod("Invoke")!;
@@ -104,22 +115,21 @@ namespace RamType0.JsonRpc.Internal
     {
         static RpcInstanceMethodEntryFactory()
         {
-            var tParams = RpcEntryFactoryCache<TDelegate>.TParams;
-
-            var tResult = RpcEntryFactoryCache<TDelegate>.TResult;
-            var methodInfo = RpcEntryFactoryCache<TDelegate>.DelegateInvokeMethodInfo;
-            var iMethodBodyType = RpcEntryFactoryCache<TDelegate>.IRpcMethodBodyType;
-            var invokeMethodToOverride = RpcEntryFactoryCache<TDelegate>.IRpcMethodInvokeMethodInfo;
-            var parameterFields = RpcEntryFactoryCache<TDelegate>.ParameterFields;
-            var methodResultType = RpcEntryFactoryCache<TDelegate>.DelegateResultType;
-            var parameterTypes = RpcEntryFactoryCache<TDelegate>.DelegateInvokeParameterTypes;
-            var tDeserializer = RpcEntryFactoryCache<TDelegate>.TDeserializer;
-            var tModifier = RpcEntryFactoryCache<TDelegate>.TModifier;
+            var tParams = RpcMethodEntryFactoryCache<TDelegate>.TParams;
+            var tResult = RpcMethodEntryFactoryCache<TDelegate>.TResult;
+            var returnType = RpcMethodEntryFactoryCache<TDelegate>.ReturnType;
+            var methodInfo = RpcMethodEntryFactoryCache<TDelegate>.DelegateInvokeMethodInfo;
+            var iMethodBodyType = RpcMethodEntryFactoryCache<TDelegate>.IRpcMethodBodyType;
+            var invokeMethodToOverride = RpcMethodEntryFactoryCache<TDelegate>.IRpcMethodInvokeMethodInfo;
+            var parameterFields = RpcMethodEntryFactoryCache<TDelegate>.ParameterFields;
+            var parameterTypes = RpcMethodEntryFactoryCache<TDelegate>.DelegateInvokeParameterTypes;
+            var tDeserializer = RpcMethodEntryFactoryCache<TDelegate>.TDeserializer;
+            var tModifier = RpcMethodEntryFactoryCache<TDelegate>.TModifier;
             var type1 = TypeArray1;
             type1[0] = tParams;
 
             {
-                var v = BuildRpcMethodTypeSignature($"{methodInfo.DeclaringType?.FullName}.{methodInfo.Name}.Invoker.Instance", iMethodBodyType, type1, tResult, invokeMethodToOverride);
+                var v = BuildRpcMethodTypeSignature($"{methodInfo.DeclaringType?.FullName}.{methodInfo.Name}.Invoker.Instance", iMethodBodyType, type1, returnType, invokeMethodToOverride);
 
                 var builder = v.TypeBuilder;
 
@@ -140,14 +150,7 @@ namespace RamType0.JsonRpc.Internal
                     //Push this
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldfld, fpField);
-                    il.EmitCalli(OpCodes.Calli, CallingConventions.HasThis, methodResultType, parameterTypes, null);
-                    if (methodResultType == typeof(void))
-                    {
-                        il.DeclareLocal(typeof(NullResult));
-                        //il.Emit(OpCodes.Ldloca_S, (byte)0);
-                        //il.Emit(OpCodes.Initobj,typeof(NullResult));
-                        il.Emit(OpCodes.Ldloc_0);
-                    }
+                    il.EmitCalli(OpCodes.Calli, CallingConventions.HasThis, returnType, parameterTypes, null);
                     il.Emit(OpCodes.Ret);
                 }
                 var tMethodBody = builder.CreateType()!;
@@ -155,7 +158,7 @@ namespace RamType0.JsonRpc.Internal
             }
         }
 
-        internal static RpcEntryFactory<TDelegate> CreateInstanceMethodEntryFactory(Type tParams, Type tResult, Type tDeserializer, Type tModifier, Type tMethodBody)
+        internal static RpcMethodEntryFactory<TDelegate> CreateInstanceMethodEntryFactory(Type tParams, Type tResult, Type tDeserializer, Type tModifier, Type tMethodBody)
             //where TDelegate:notnull,Delegate
         {
 
@@ -166,12 +169,12 @@ namespace RamType0.JsonRpc.Internal
             type6[3] = tResult;
             type6[4] = tDeserializer;
             type6[5] = tModifier;
-            return Unsafe.As<RpcEntryFactory<TDelegate>>(Activator.CreateInstance(typeof(RpcInstanceMethodEntryFactory<,,,,,>).MakeGenericType(type6)));
+            return Unsafe.As<RpcMethodEntryFactory<TDelegate>>(Activator.CreateInstance(typeof(RpcInstanceMethodEntryFactory<,,,,,>).MakeGenericType(type6)));
 
 
         }
 
-        public static RpcEntryFactory<TDelegate> Instance { get; }
+        public static RpcMethodEntryFactory<TDelegate> Instance { get; }
     }
 
     internal static class RpcStaticMethodEntryFactory<TDelegate>
@@ -179,22 +182,21 @@ namespace RamType0.JsonRpc.Internal
     {
         static RpcStaticMethodEntryFactory()
         {
-            var tParams = RpcEntryFactoryCache<TDelegate>.TParams;
-
-            var tResult = RpcEntryFactoryCache<TDelegate>.TResult;
-            var methodInfo = RpcEntryFactoryCache<TDelegate>.DelegateInvokeMethodInfo;
-            var iMethodBodyType = RpcEntryFactoryCache<TDelegate>.IRpcMethodBodyType;
-            var invokeMethodToOverride = RpcEntryFactoryCache<TDelegate>.IRpcMethodInvokeMethodInfo;
-            var parameterFields = RpcEntryFactoryCache<TDelegate>.ParameterFields;
-            var methodResultType = RpcEntryFactoryCache<TDelegate>.DelegateResultType;
-            var parameterTypes = RpcEntryFactoryCache<TDelegate>.DelegateInvokeParameterTypes;
-            var tDeserializer = RpcEntryFactoryCache<TDelegate>.TDeserializer;
-            var tModifier = RpcEntryFactoryCache<TDelegate>.TModifier;
+            var tParams = RpcMethodEntryFactoryCache<TDelegate>.TParams;
+            var tResult = RpcMethodEntryFactoryCache<TDelegate>.TResult;
+            var returnType = RpcMethodEntryFactoryCache<TDelegate>.ReturnType;
+            var methodInfo = RpcMethodEntryFactoryCache<TDelegate>.DelegateInvokeMethodInfo;
+            var iMethodBodyType = RpcMethodEntryFactoryCache<TDelegate>.IRpcMethodBodyType;
+            var invokeMethodToOverride = RpcMethodEntryFactoryCache<TDelegate>.IRpcMethodInvokeMethodInfo;
+            var parameterFields = RpcMethodEntryFactoryCache<TDelegate>.ParameterFields;
+            var parameterTypes = RpcMethodEntryFactoryCache<TDelegate>.DelegateInvokeParameterTypes;
+            var tDeserializer = RpcMethodEntryFactoryCache<TDelegate>.TDeserializer;
+            var tModifier = RpcMethodEntryFactoryCache<TDelegate>.TModifier;
             var type1 = TypeArray1;
             type1[0] = tParams;
 
             {
-                var v = BuildRpcMethodTypeSignature($"{methodInfo.DeclaringType?.FullName}.{methodInfo.Name}.Invoker.Static", iMethodBodyType, type1, tResult, invokeMethodToOverride);
+                var v = BuildRpcMethodTypeSignature($"{methodInfo.DeclaringType?.FullName}.{methodInfo.Name}.Invoker.Static", iMethodBodyType, type1, returnType, invokeMethodToOverride);
 
                 var builder = v.TypeBuilder;
 
@@ -212,14 +214,7 @@ namespace RamType0.JsonRpc.Internal
                     //Push this
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldfld, fpField);
-                    il.EmitCalli(OpCodes.Calli, CallingConventions.Standard, methodResultType, parameterTypes, null);
-                    if (methodResultType == typeof(void))
-                    {
-                        il.DeclareLocal(typeof(NullResult));
-                        //il.Emit(OpCodes.Ldloca_S, (byte)0);
-                        //il.Emit(OpCodes.Initobj,typeof(NullResult));
-                        il.Emit(OpCodes.Ldloc_0);
-                    }
+                    il.EmitCalli(OpCodes.Calli, CallingConventions.Standard, returnType, parameterTypes, null);
                     il.Emit(OpCodes.Ret);
                 }
                 var tMethodBody = builder.CreateType()!;
@@ -227,7 +222,7 @@ namespace RamType0.JsonRpc.Internal
             }
         }
 
-        internal static RpcEntryFactory<TDelegate> CreateStaticMethodEntryFactory(Type tParams, Type tResult, Type tDeserializer, Type tModifier, Type tMethodBody)
+        internal static RpcMethodEntryFactory<TDelegate> CreateStaticMethodEntryFactory(Type tParams, Type tResult, Type tDeserializer, Type tModifier, Type tMethodBody)
             //where TDelegate :notnull,Delegate
         {
 
@@ -238,12 +233,12 @@ namespace RamType0.JsonRpc.Internal
             type6[3] = tResult;
             type6[4] = tDeserializer;
             type6[5] = tModifier;
-            return Unsafe.As<RpcEntryFactory<TDelegate>>(Activator.CreateInstance(typeof(RpcStaticMethodEntryFactory<,,,,,>).MakeGenericType(type6)));
+            return Unsafe.As<RpcMethodEntryFactory<TDelegate>>(Activator.CreateInstance(typeof(RpcStaticMethodEntryFactory<,,,,,>).MakeGenericType(type6)));
 
 
         }
 
-        public static RpcEntryFactory<TDelegate> Instance { get; }
+        public static RpcMethodEntryFactory<TDelegate> Instance { get; }
     }
 
     internal static class RpcDelegateEntryFactory<TDelegate>
@@ -252,20 +247,20 @@ namespace RamType0.JsonRpc.Internal
 
         static RpcDelegateEntryFactory()
         {
-            var tParams = RpcEntryFactoryCache<TDelegate>.TParams;
-            var tResult = RpcEntryFactoryCache<TDelegate>.TResult;
-            var methodInfo = RpcEntryFactoryCache<TDelegate>.DelegateInvokeMethodInfo;
-            var iMethodBodyType = RpcEntryFactoryCache<TDelegate>.IRpcMethodBodyType;
-            var invokeMethodToOverride = RpcEntryFactoryCache<TDelegate>.IRpcMethodInvokeMethodInfo;
-            var parameterFields = RpcEntryFactoryCache<TDelegate>.ParameterFields;
-            var methodResultType = RpcEntryFactoryCache<TDelegate>.DelegateResultType;
+            var tParams = RpcMethodEntryFactoryCache<TDelegate>.TParams;
+            var tResult = RpcMethodEntryFactoryCache<TDelegate>.TResult;
+            var returnType = RpcMethodEntryFactoryCache<TDelegate>.ReturnType;
+            var methodInfo = RpcMethodEntryFactoryCache<TDelegate>.DelegateInvokeMethodInfo;
+            var iMethodBodyType = RpcMethodEntryFactoryCache<TDelegate>.IRpcMethodBodyType;
+            var invokeMethodToOverride = RpcMethodEntryFactoryCache<TDelegate>.IRpcMethodInvokeMethodInfo;
+            var parameterFields = RpcMethodEntryFactoryCache<TDelegate>.ParameterFields;
             //var parameterTypes = RpcEntryFactoryDelegateTypeCache<TDelegate>.DelegateInvokeParameterTypes;
-            var tDeserializer = RpcEntryFactoryCache<TDelegate>.TDeserializer;
-            var tModifier = RpcEntryFactoryCache<TDelegate>.TModifier;
+            var tDeserializer = RpcMethodEntryFactoryCache<TDelegate>.TDeserializer;
+            var tModifier = RpcMethodEntryFactoryCache<TDelegate>.TModifier;
             var type1 = TypeArray1;
             type1[0] = tParams;
             {
-                var v = BuildRpcMethodTypeSignature($"{methodInfo.DeclaringType?.FullName}.{methodInfo.Name}.Invoker.Delegate", iMethodBodyType, type1, tResult, invokeMethodToOverride);
+                var v = BuildRpcMethodTypeSignature($"{methodInfo.DeclaringType?.FullName}.{methodInfo.Name}.Invoker.Delegate", iMethodBodyType, type1, returnType, invokeMethodToOverride);
 
                 var builder = v.TypeBuilder;
                 var delegateField = DefineDelegateProperty(builder);
@@ -282,13 +277,6 @@ namespace RamType0.JsonRpc.Internal
                     }
                     //Push this
                     il.Emit(OpCodes.Callvirt, methodInfo);
-                    if (methodResultType == typeof(void))
-                    {
-                        il.DeclareLocal(typeof(NullResult));
-                        //il.Emit(OpCodes.Ldloca_S, (byte)0);
-                        //il.Emit(OpCodes.Initobj,typeof(NullResult));
-                        il.Emit(OpCodes.Ldloc_0);
-                    }
                     il.Emit(OpCodes.Ret);
                 }
                 var tMethodBody = builder.CreateType()!;
@@ -296,7 +284,7 @@ namespace RamType0.JsonRpc.Internal
             }
         }
 
-        internal static RpcEntryFactory<TDelegate> CreateDelegateEntryFactory(Type tParams, Type tResult, Type tDeserializer, Type tModifier, Type tMethodBody)
+        internal static RpcMethodEntryFactory<TDelegate> CreateDelegateEntryFactory(Type tParams, Type tResult, Type tDeserializer, Type tModifier, Type tMethodBody)
             //where TDelegate : notnull,Delegate
         {
             var type6 = TypeArray6;
@@ -306,14 +294,14 @@ namespace RamType0.JsonRpc.Internal
             type6[3] = tResult;
             type6[4] = tDeserializer;
             type6[5] = tModifier;
-            return Unsafe.As<RpcEntryFactory<TDelegate>>(Activator.CreateInstance(typeof(RpcDelegateEntryFactory<,,,,,>).MakeGenericType(type6)));
+            return Unsafe.As<RpcMethodEntryFactory<TDelegate>>(Activator.CreateInstance(typeof(RpcDelegateEntryFactory<,,,,,>).MakeGenericType(type6)));
 
         }
 
-        public static RpcEntryFactory<TDelegate> Instance { get; }
+        public static RpcMethodEntryFactory<TDelegate> Instance { get; }
     }
 
-    internal static class RpcEntryFactoryHelper
+    internal static class RpcMethodEntryFactoryHelper
     {
         internal static CustomAttributeBuilder RpcIdAttributeBuilder { get; } = new CustomAttributeBuilder(typeof(RpcIDAttribute).GetConstructor(Type.EmptyTypes)!, Array.Empty<object>());
         internal static MethodInfo FunctionPointerSetter { get; } = typeof(IFunctionPointerContainer).GetMethod("set_FunctionPointer")!;
@@ -525,7 +513,7 @@ namespace RamType0.JsonRpc.Internal
 
     }
 
-    internal sealed class RpcInstanceMethodEntryFactory<TDelegate, TMethod, TParams, TResult, TDeserializer, TModifier> : RpcEntryFactory<TDelegate>
+    internal sealed class RpcInstanceMethodEntryFactory<TDelegate, TMethod, TParams, TResult, TDeserializer, TModifier> : RpcMethodEntryFactory<TDelegate>
 
         where TDelegate : notnull, Delegate
         where TMethod : struct, IRpcMethodBody<TParams, TResult>, IFunctionPointerContainer, IObjectReferenceContainer
@@ -539,16 +527,16 @@ namespace RamType0.JsonRpc.Internal
 
 
 
-        public override RpcEntry CreateEntry(TDelegate d,IExceptionHandler exceptionHandler)
+        public override RpcMethodEntry CreateEntry(TDelegate d,IExceptionHandler exceptionHandler)
         {
             var method = this.method;
             method.FunctionPointer = d.Method.MethodHandle.GetFunctionPointer();
             method.Target = d.Target!;
-            return new RpcEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier,exceptionHandler);
+            return new RpcMethodEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier,exceptionHandler);
         }
     }
 
-    internal sealed class RpcStaticMethodEntryFactory<TDelegate, TMethod, TParams, TResult, TDeserializer, TModifier> : RpcEntryFactory<TDelegate>
+    internal sealed class RpcStaticMethodEntryFactory<TDelegate, TMethod, TParams, TResult, TDeserializer, TModifier> : RpcMethodEntryFactory<TDelegate>
         where TDelegate : notnull, Delegate
         where TMethod : struct, IRpcMethodBody<TParams, TResult>, IFunctionPointerContainer
         where TParams : notnull
@@ -561,15 +549,15 @@ namespace RamType0.JsonRpc.Internal
 
 
 
-        public override RpcEntry CreateEntry(TDelegate d,IExceptionHandler exceptionHandler)
+        public override RpcMethodEntry CreateEntry(TDelegate d,IExceptionHandler exceptionHandler)
         {
             var method = this.method;
             method.FunctionPointer = d.Method.MethodHandle.GetFunctionPointer();
-            return new RpcEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier,exceptionHandler);
+            return new RpcMethodEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier,exceptionHandler);
         }
     }
 
-    internal sealed class RpcDelegateEntryFactory<TDelegate, TMethod, TParams, TResult, TDeserializer, TModifier> : RpcEntryFactory<TDelegate>
+    internal sealed class RpcDelegateEntryFactory<TDelegate, TMethod, TParams, TResult, TDeserializer, TModifier> : RpcMethodEntryFactory<TDelegate>
         where TDelegate : notnull, Delegate
         where TMethod : struct, IRpcMethodBody<TParams, TResult>, IDelegateContainer<Delegate>
         where TParams : notnull
@@ -579,11 +567,11 @@ namespace RamType0.JsonRpc.Internal
         internal TMethod method;
         internal TDeserializer deserializer;
         internal TModifier modifier;
-        public override RpcEntry CreateEntry(TDelegate d,IExceptionHandler exceptionHandler)
+        public override RpcMethodEntry CreateEntry(TDelegate d,IExceptionHandler exceptionHandler)
         {
             var method = this.method;
             method.Delegate = d;
-            return new RpcEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier,exceptionHandler);
+            return new RpcMethodEntry<TMethod, TParams, TResult, TDeserializer, TModifier>(method, deserializer, modifier,exceptionHandler);
         }
     }
 }
