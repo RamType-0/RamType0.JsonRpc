@@ -265,7 +265,7 @@ namespace RamType0.JsonRpc.Tests
         [Test]
         public void CalliStandardEntry()
         {
-            var entry = Internal.RpcMethodEntry.FromDelegate<Func<int,int,int>>(Math.Max);
+            var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<Func<int,int,int>>(Math.Max);
             var arg = Encoding.UTF8.GetBytes("[2,1]");
             var json = entry.ResolveRequest(arg,new ID(1), JsonSerializer.DefaultResolver);
             var str = Encoding.UTF8.GetString(json);
@@ -274,7 +274,7 @@ namespace RamType0.JsonRpc.Tests
         [Test]
         public void CalliHasThisEntry()
         {
-            var entry = Internal.RpcMethodEntry.FromDelegate<Func<string>>("114514".ToString);
+            var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<Func<string>>("114514".ToString);
             var arg = Encoding.UTF8.GetBytes("[]");
             var json = entry.ResolveRequest(arg, new ID(1), JsonSerializer.DefaultResolver);
             var str = Encoding.UTF8.GetString(json);
@@ -283,7 +283,7 @@ namespace RamType0.JsonRpc.Tests
         [Test]
         public void CalliHasThisEntryEmptyParams()
         {
-            var entry = Internal.RpcMethodEntry.FromDelegate<Func<string>>("114514".ToString);
+            var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<Func<string>>("114514".ToString);
             var json = entry.ResolveRequest(default, new ID(1), JsonSerializer.DefaultResolver);
             var str = Encoding.UTF8.GetString(json);
         }
@@ -291,7 +291,7 @@ namespace RamType0.JsonRpc.Tests
         [Test]
         public void CalliEmptyParamsInjectID()
         {
-            var entry = Internal.RpcMethodEntry.FromDelegate<InjectID>(id => id.ToString());
+            var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<InjectID>(id => id.ToString());
             var json = entry.ResolveRequest(default, new ID(1145141919810364364), JsonSerializer.DefaultResolver);
             var str = Encoding.UTF8.GetString(json);
         }
@@ -302,7 +302,7 @@ namespace RamType0.JsonRpc.Tests
         [Test]
         public void CalliEmptyParamsInjectIDResolveReq()
         {
-            var entry = Internal.RpcMethodEntry.FromDelegate<InjectID>(id => id.ToString());
+            var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<InjectID>(id => id.ToString());
             var resolver = new Internal.RequestResolver();
             resolver.TryRegister("공격전이다", entry);
             var request = $"{{\"jsonrpc\":\"2.0\",\"params\":[],\"method\":\"공격전이다\",\"id\":114514}}";
@@ -314,7 +314,7 @@ namespace RamType0.JsonRpc.Tests
         [Test]
         public void Calli()
         {
-            var entry = Internal.RpcMethodEntry.FromDelegate<Action>(()=> { });
+            var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<Action>(()=> { });
             var resolver = new Internal.RequestResolver();
             resolver.TryRegister("Hello", entry);
             var request = "{\"jsonrpc\":\"2.0\",\"method\":\"Hello\",\"id\":1}";
@@ -328,7 +328,7 @@ namespace RamType0.JsonRpc.Tests
             var i = 0;
             Func<int> func = () => i++;
             func += func;
-            var entry = Internal.RpcMethodEntry.FromDelegate(func);
+            var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate(func);
             var resolver = new Internal.RequestResolver();
             resolver.TryRegister("Hello", entry);
             var request = "{\"jsonrpc\":\"2.0\",\"method\":\"Hello\",\"id\":1}";
@@ -344,7 +344,7 @@ namespace RamType0.JsonRpc.Tests
         [Test]
         public void ExplicitParamsObjectFunc()
         {
-            var entry = Internal.RpcMethodEntry.ExplicitParams((Param p) => p.i);
+            var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.ExplicitParams((Param p) => p.i);
             var resolver = new Internal.RequestResolver();
             resolver.TryRegister("Hello", entry);
             var request = "{\"jsonrpc\":\"2.0\",\"params\":{\"i\":114514},\"method\":\"Hello\",\"id\":1}";
@@ -354,11 +354,40 @@ namespace RamType0.JsonRpc.Tests
         [Test]
         public void ExplicitParamsObjectAction()
         {
-            var entry = Internal.RpcMethodEntry.ExplicitParams((Param p) => { });
+            var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.ExplicitParams((Param p) => { });
             var resolver = new Internal.RequestResolver();
             resolver.TryRegister("Hello", entry);
             var request = "{\"jsonrpc\":\"2.0\",\"params\":{\"i\":114514},\"method\":\"Hello\",\"id\":1}";
             var json = resolver.Resolve(Encoding.UTF8.GetBytes(request));
+            var str = Encoding.UTF8.GetString(json);
+        }
+
+        delegate ValueTask<string> InjectIDAsyncVT([RpcID] ID? id);
+        delegate Task<string> InjectIDAsyncT([RpcID] ID? id);
+        [Test]
+        public async ValueTask CalliEmptyParamsInjectIDAsyncValueTask()
+        {
+            var entry = Internal.RpcMethodEntry.FromDelegate<InjectIDAsyncVT>
+                (async id => 
+            {
+                await Task.Delay(1000);
+                return id.ToString();
+            });
+            Assert.IsNotAssignableFrom<Internal.RpcMethodEntry>(entry);
+            var json = await entry.ResolveRequestAsync(default, new ID(1145141919810364364), JsonSerializer.DefaultResolver);
+            var str = Encoding.UTF8.GetString(json);
+        }
+        [Test]
+        public async ValueTask CalliEmptyParamsInjectIDAsyncTask()
+        {
+            var entry = Internal.RpcMethodEntry.FromDelegate<InjectIDAsyncT>
+                (async id =>
+                {
+                    await Task.Delay(1000);
+                    return id.ToString();
+                });
+            Assert.IsNotAssignableFrom<Internal.RpcMethodEntry>(entry);
+            var json = await entry.ResolveRequestAsync(default, new ID(1145141919810364364), JsonSerializer.DefaultResolver);
             var str = Encoding.UTF8.GetString(json);
         }
     }

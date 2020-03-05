@@ -6,48 +6,51 @@ using System.Threading.Tasks;
 using Utf8Json;
 namespace RamType0.JsonRpc.Internal
 {
-    public abstract class RpcMethodEntry : IRpcMethodEntry
+    public abstract class RpcMethodEntry : RpcAsyncMethodEntry
     {
-        public static RpcMethodEntry FromDelegate<T>(T d) where T : notnull, Delegate => FromDelegate(d, StandardExceptionHandler.Instance);
-        public static RpcMethodEntry FromDelegate<T>(T d,IExceptionHandler exceptionHandler)
+        public static RpcAsyncMethodEntry FromDelegate<T>(T d) where T : notnull, Delegate => FromDelegate(d, StandardExceptionHandler.Instance);
+        public static RpcAsyncMethodEntry FromDelegate<T>(T d,IExceptionHandler exceptionHandler)
             where T:notnull, Delegate
         {
             if (d is MulticastDelegate multicast && multicast.GetInvocationList().Length > 1)
             {
-                return RpcDelegateEntryFactory<T>.Instance.CreateEntry(d,exceptionHandler);
+                return RpcDelegateEntryFactory<T>.Instance.CreateAsyncMethodEntry(d,exceptionHandler);
             }
             else if (d.Method.IsStatic)
             {
-                return RpcStaticMethodEntryFactory<T>.Instance.CreateEntry(d,exceptionHandler);
+                return RpcStaticMethodEntryFactory<T>.Instance.CreateAsyncMethodEntry(d,exceptionHandler);
             }
             else
             {
-                return RpcInstanceMethodEntryFactory<T>.Instance.CreateEntry(d,exceptionHandler);
+                return RpcInstanceMethodEntryFactory<T>.Instance.CreateAsyncMethodEntry(d,exceptionHandler);
             }
             
         }
 
-        public static RpcMethodEntry ExplicitParams<TParams>(Action<TParams> explicitParamsAction) => ExplicitParams(explicitParamsAction, StandardExceptionHandler.Instance);
+        public static RpcAsyncMethodEntry ExplicitParams<TParams>(Action<TParams> explicitParamsAction) => ExplicitParams(explicitParamsAction, StandardExceptionHandler.Instance);
 
-        public static RpcMethodEntry ExplicitParams<TParams>(Action<TParams> explicitParamsAction, IExceptionHandler exceptionHandler)
+        public static RpcAsyncMethodEntry ExplicitParams<TParams>(Action<TParams> explicitParamsAction, IExceptionHandler exceptionHandler)
         {
-            return RpcExplicitParamsActionDelegateEntryFactory<TParams>.Instance.CreateEntry(explicitParamsAction,exceptionHandler);
+            return RpcExplicitParamsActionDelegateEntryFactory<TParams>.Instance.CreateAsyncMethodEntry(explicitParamsAction,exceptionHandler);
         }
 
-        public static RpcMethodEntry ExplicitParams<TParams, TResult>(Func<TParams, TResult> explicitParamsFunc) => ExplicitParams(explicitParamsFunc, StandardExceptionHandler.Instance);
+        public static RpcAsyncMethodEntry ExplicitParams<TParams, TResult>(Func<TParams, TResult> explicitParamsFunc) => ExplicitParams(explicitParamsFunc, StandardExceptionHandler.Instance);
 
-        public static RpcMethodEntry ExplicitParams<TParams,TResult>(Func<TParams,TResult> explicitParamsFunc, IExceptionHandler exceptionHandler)
+        public static RpcAsyncMethodEntry ExplicitParams<TParams,TResult>(Func<TParams,TResult> explicitParamsFunc, IExceptionHandler exceptionHandler)
         {
-            return RpcExplicitParamsFuncDelegateEntryFactory<TParams, TResult>.Instance.CreateEntry(explicitParamsFunc,exceptionHandler);
+            return RpcExplicitParamsFuncDelegateEntryFactory<TParams, TResult>.Instance.CreateAsyncMethodEntry(explicitParamsFunc,exceptionHandler);
         }
 
         public abstract ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readFormatterResolver,IJsonFormatterResolver writeFormatterResolver);
+        public override sealed ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver)
+        {
+            return new ValueTask<ArraySegment<byte>>(ResolveRequest(serializedParameters, id, readFormatterResolver, writeFormatterResolver));
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readWriteFormatterResolver) => ResolveRequest(serializedParameters, id, readWriteFormatterResolver, readWriteFormatterResolver);
     }
     public class RpcMethodEntry<TMethod,TParams,TResult,TDeserializer,TModifier> : RpcMethodEntry
         where TMethod : notnull,IRpcMethodBody<TParams, TResult>
-        where TParams : notnull
         where TDeserializer : notnull,IParamsDeserializer<TParams>
         where TModifier : notnull,IMethodParamsModifier<TParams>
     {

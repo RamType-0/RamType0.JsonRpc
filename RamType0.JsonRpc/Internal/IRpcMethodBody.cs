@@ -7,9 +7,10 @@ using Utf8Json;
 namespace RamType0.JsonRpc.Internal
 {
 
-    public interface IRpcMethodBody<in TParams,out TResult>
+    public interface IRpcMethodBody<in TParams,TResult> : IRpcAsyncMethodBody<TParams,TResult>
     {
         public TResult Invoke(TParams parameters);
+        ValueTask<TResult> IRpcAsyncMethodBody<TParams, TResult>.InvokeAsync(TParams parameters) => new ValueTask<TResult>(Invoke(parameters));
     }
 
     public interface IRpcMethodBody<in TParams> : IRpcMethodBody<TParams, NullResult>
@@ -24,11 +25,11 @@ namespace RamType0.JsonRpc.Internal
 
     public interface IRpcAsyncMethodBody<in TParams,TResult>
     {
-        public ValueTask<TResult> Invoke(TParams parameters);
+        public ValueTask<TResult> InvokeAsync(TParams parameters);
     }
     public interface IRpcAsyncMethodBody<in TParams>
     {
-        public ValueTask Invoke(TParams parameters);
+        public ValueTask InvokeAsync(TParams parameters);
     }
 
     public interface IFunctionPointerContainer
@@ -52,13 +53,5 @@ namespace RamType0.JsonRpc.Internal
         public void Modify(ref TParams parameters, ArraySegment<byte> parametersSegment, ID? id, IJsonFormatterResolver formatterResolver);
     }
 
-    public interface IRpcMethodEntry : IRpcAsyncMethodEntry
-    {
-        public ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver);
-        ValueTask<ArraySegment<byte>> IRpcAsyncMethodEntry.ResolveRequestAsync(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver) => new ValueTask<ArraySegment<byte>>(ResolveRequest(serializedParameters, id, readFormatterResolver, writeFormatterResolver));
-    }
-    public interface IRpcAsyncMethodEntry
-    {
-        public ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver);
-    }
+
 }
