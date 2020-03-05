@@ -49,7 +49,7 @@ namespace RamType0.JsonRpc.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ArraySegment<byte> ResolveRequest(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readWriteFormatterResolver) => ResolveRequest(serializedParameters, id, readWriteFormatterResolver, readWriteFormatterResolver);
     }
-    public class RpcMethodEntry<TMethod,TParams,TResult,TDeserializer,TModifier> : RpcMethodEntry
+    sealed class RpcMethodEntry<TMethod,TParams,TResult,TDeserializer,TModifier> : RpcMethodEntry
         where TMethod : notnull,IRpcMethodBody<TParams, TResult>
         where TDeserializer : notnull,IParamsDeserializer<TParams>
         where TModifier : notnull,IMethodParamsModifier<TParams>

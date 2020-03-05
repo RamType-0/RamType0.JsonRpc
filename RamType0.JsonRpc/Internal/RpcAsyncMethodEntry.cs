@@ -14,7 +14,7 @@ namespace RamType0.JsonRpc.Internal
         public ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readWriteFormatterResolver) => ResolveRequestAsync(serializedParameters, id, readWriteFormatterResolver, readWriteFormatterResolver);
 
     }
-    class RpcAsyncMethodEntry<TMethod, TParams, TResult, TDeserializer, TModifier> : RpcAsyncMethodEntry
+    sealed class RpcAsyncMethodEntry<TMethod, TParams, TResult, TDeserializer, TModifier> : RpcAsyncMethodEntry
         where TMethod : notnull, IRpcAsyncMethodBody<TParams, TResult>
         where TDeserializer : notnull, IParamsDeserializer<TParams>
         where TModifier : notnull, IMethodParamsModifier<TParams>
@@ -100,7 +100,7 @@ namespace RamType0.JsonRpc.Internal
 
         }
     }
-    class RpcAsyncMethodEntry<TMethod, TParams, TDeserializer, TModifier> : RpcAsyncMethodEntry
+    sealed class RpcAsyncMethodEntry<TMethod, TParams, TDeserializer, TModifier> : RpcAsyncMethodEntry
         where TMethod : notnull, IRpcAsyncMethodBody<TParams>
         where TDeserializer : notnull, IParamsDeserializer<TParams>
         where TModifier : notnull, IMethodParamsModifier<TParams>
