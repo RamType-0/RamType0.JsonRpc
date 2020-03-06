@@ -70,7 +70,7 @@ namespace RamType0.JsonRpc.Internal
         }
 
      
-        protected override void OnSendComplete()
+        private protected override void OnSendComplete()
         {
             core.SetResult(new NullResult());
         }

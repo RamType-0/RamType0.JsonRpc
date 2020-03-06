@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Utf8Json;
 using Utf8Json.Resolvers;
-
+using System.Linq;
 namespace RamType0.JsonRpc.Tests
 {
     public class Tests
@@ -267,7 +267,7 @@ namespace RamType0.JsonRpc.Tests
         {
             var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<Func<int,int,int>>(Math.Max);
             var arg = Encoding.UTF8.GetBytes("[2,1]");
-            var json = entry.ResolveRequest(arg,new ID(1), JsonSerializer.DefaultResolver);
+            var json = entry.ResolveRequest(arg,new ID(1));
             var str = Encoding.UTF8.GetString(json);
         }
 
@@ -276,7 +276,7 @@ namespace RamType0.JsonRpc.Tests
         {
             var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<Func<string>>("114514".ToString);
             var arg = Encoding.UTF8.GetBytes("[]");
-            var json = entry.ResolveRequest(arg, new ID(1), JsonSerializer.DefaultResolver);
+            var json = entry.ResolveRequest(arg, new ID(1));
             var str = Encoding.UTF8.GetString(json);
         }
 
@@ -284,7 +284,7 @@ namespace RamType0.JsonRpc.Tests
         public void CalliHasThisEntryEmptyParams()
         {
             var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<Func<string>>("114514".ToString);
-            var json = entry.ResolveRequest(default, new ID(1), JsonSerializer.DefaultResolver);
+            var json = entry.ResolveRequest(default, new ID(1));
             var str = Encoding.UTF8.GetString(json);
         }
 
@@ -292,7 +292,7 @@ namespace RamType0.JsonRpc.Tests
         public void CalliEmptyParamsInjectID()
         {
             var entry = (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate<InjectID>(id => id.ToString());
-            var json = entry.ResolveRequest(default, new ID(1145141919810364364), JsonSerializer.DefaultResolver);
+            var json = entry.ResolveRequest(default, new ID(1145141919810364364));
             var str = Encoding.UTF8.GetString(json);
         }
 
@@ -374,7 +374,7 @@ namespace RamType0.JsonRpc.Tests
                 return id.ToString();
             });
             Assert.IsNotAssignableFrom<Internal.RpcMethodEntry>(entry);
-            var json = await entry.ResolveRequestAsync(default, new ID(1145141919810364364), JsonSerializer.DefaultResolver);
+            var json = await entry.ResolveRequestAsync(default, new ID(1145141919810364364));
             var str = Encoding.UTF8.GetString(json);
         }
         [Test]
@@ -387,8 +387,56 @@ namespace RamType0.JsonRpc.Tests
                     return id.ToString();
                 });
             Assert.IsNotAssignableFrom<Internal.RpcMethodEntry>(entry);
-            var json = await entry.ResolveRequestAsync(default, new ID(1145141919810364364), JsonSerializer.DefaultResolver);
+            var json = await entry.ResolveRequestAsync(default, new ID(1145141919810364364));
             var str = Encoding.UTF8.GetString(json);
         }
+
+        public struct Params
+        {
+            public int i;
+        }
+
+        [Test]
+        public Task PipeDuplex()
+        {
+            var a2b = new Pipe();
+            var b2a = new Pipe();
+            var domainA = new Marshaling.PipeIOHeaderDelimitedRpcDomain(b2a.Reader, a2b.Writer);
+            var domainB = new Marshaling.PipeIOHeaderDelimitedRpcDomain(a2b.Reader, b2a.Writer);
+            _ =domainA.StartAsync();
+            _ =domainB.StartAsync();
+            var methodEntry = Internal.RpcMethodEntry.ExplicitParams<Params, int>(p => p.i);
+            domainA.AddMethod("getI", methodEntry);
+            domainB.AddMethod("getI", methodEntry);
+            var aMethodHandle = new Internal.RpcMethodHandle(domainA, "getI", JsonSerializer.DefaultResolver);
+            var bMethodHandle = new Internal.RpcMethodHandle(domainB, "getI", JsonSerializer.DefaultResolver);
+
+            var tasks = new Task[200000];
+            var a2bTasks = tasks.AsSpan(100000);
+            var b2aTasks = tasks.AsSpan(0, 100000);
+            for (int i = 0; i < a2bTasks.Length; i++)
+            {
+                var taskLocalI = i;
+                a2bTasks[i] = Task.Run(async () =>
+                {
+                    var task = aMethodHandle.RequestAsync<Params, int>(new Params() { i = taskLocalI });
+                    var resultI = await task;
+                    Assert.AreEqual(taskLocalI, resultI);
+                });
+            }
+            for (int i = 0; i < b2aTasks.Length; i++)
+            {
+                var taskLocalI = i;
+                b2aTasks[i] = Task.Run( async() =>
+                {
+                    var task = bMethodHandle.RequestAsync<Params, int>(new Params() { i = taskLocalI });
+                    var resultI = await task;
+                    Assert.AreEqual(taskLocalI, resultI);
+                });
+            }
+            return Task.WhenAll(tasks);
+            
+        }
+
     }
 }

@@ -141,6 +141,7 @@ namespace RamType0.JsonRpc.Protocol
 
     public struct ErrorResponse : IErrorResponse
     {
+        [DataMember(Name = "jsonrpc")]
         public JsonRpcVersion Version => default;
         [JsonFormatter(typeof(ID.Formatter.Nullable))]
         [DataMember(Name = "id")]

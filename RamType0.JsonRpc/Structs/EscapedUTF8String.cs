@@ -183,15 +183,16 @@ namespace RamType0.JsonRpc
             {
                 var quotedLength = value.Length + 2;
                 writer.EnsureCapacity(quotedLength);
-                var dstBuffer = writer.GetBuffer().AsSpan();
-                ref var dstRef = ref MemoryMarshal.GetReference(dstBuffer);
-                dstRef = (byte)'"';
-                dstRef = Unsafe.AddByteOffset(ref dstRef, (IntPtr)1);
-                ref var srcRef = ref MemoryMarshal.GetReference(value.bytes.AsSpan());
-                Unsafe.CopyBlockUnaligned(ref dstRef,ref srcRef , (uint)value.Length);
-                dstRef = Unsafe.AddByteOffset(ref dstRef, (IntPtr)value.Length);
-                dstRef = (byte)'"';
-                writer.AdvanceOffset(quotedLength);
+                var writtenBuffer = writer.GetBuffer();
+                var dstBuffer = writtenBuffer.Array!.AsSpan(writtenBuffer.Offset + writtenBuffer.Count);
+                dstBuffer[0] = (byte)'"';
+                writer.AdvanceOffset(1);
+                dstBuffer = dstBuffer[1..];
+                value.bytes.AsSpan().CopyTo(dstBuffer);
+                writer.AdvanceOffset(value.Length);
+                dstBuffer = dstBuffer[value.Length..];
+                dstBuffer[0] = (byte)'"';
+                writer.AdvanceOffset(1);
             }
             private static EscapedUTF8String? DeserializeNullableUnsafe(ref JsonReader reader)
             {

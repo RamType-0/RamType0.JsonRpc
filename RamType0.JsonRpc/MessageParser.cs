@@ -428,7 +428,9 @@ namespace RamType0.JsonRpc
             {
                 var span = value.AsSpan();
                 writer.EnsureCapacity(span.Length);
-                span.CopyTo(writer.GetBuffer().AsSpan());
+                var writtenBuffer = writer.GetBuffer();
+                var buffer = writtenBuffer.Array!.AsSpan(writtenBuffer.Offset+ writtenBuffer.Count);
+                span.CopyTo(buffer);
                 writer.AdvanceOffset(span.Length);
             }
         }

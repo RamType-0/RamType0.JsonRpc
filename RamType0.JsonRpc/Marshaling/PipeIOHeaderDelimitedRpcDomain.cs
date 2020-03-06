@@ -1,110 +1,152 @@
 ﻿using RamType0.JsonRpc.Internal;
-using RamType0.JsonRpc.Protocol;
+using RamType0.JsonRpc.Marshaling;
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
-using System.Text;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Utf8Json;
 
-namespace RamType0.JsonRpc.Duplex
+namespace RamType0.JsonRpc.Marshaling
 {
-    public sealed class DuplexConnection
+    public sealed class PipeIOHeaderDelimitedRpcDomain : RpcDomain
     {
-        RpcDomain Domain { get; }
         PipeReader Input { get; }
-        ConcurrentDictionary<EscapedUTF8String, RpcAsyncMethodEntry> MethodEntries { get; } = new ConcurrentDictionary<EscapedUTF8String, RpcAsyncMethodEntry>();
-        public bool AddMethod(string name,RpcAsyncMethodEntry methodEntry)
+        PipeWriter Output { get; }
+        public PipeIOHeaderDelimitedRpcDomain(PipeReader input,PipeWriter output)
         {
-            return MethodEntries.TryAdd(EscapedUTF8String.FromUnEscaped(name), methodEntry);
+            Input = input;
+            Output = output;
         }
-        public bool RemoveMethod(string name,[NotNullWhen(true)]out RpcAsyncMethodEntry? methodEntry)
+
+        public ValueTask StartAsync(CancellationToken cancellationToken = default)
         {
-            return MethodEntries.TryRemove(EscapedUTF8String.FromUnEscaped(name), out methodEntry);
+            var resolve = Task.Run(async () => await ResolveMessagesAsync(cancellationToken));
+            //var send = Task.Run(async () => await SendMessagesAsync(cancellationToken));
+            var send = Task.Run(async () => await SendMessagesAsyncThroughPut(65536,cancellationToken));
+            return new ValueTask(Task.WhenAll(resolve, send));
         }
-        IJsonFormatterResolver JsonFormatterResolver { get; }
-        public async ValueTask ResolveMessagesAsync(CancellationToken cancellationToken = default)
+
+        async ValueTask SendMessagesAsyncThroughPut(int bufferedMessages = 32, CancellationToken cancellationToken = default)
+        {
+            IAsyncEnumerator<MessageHandle>? enumerator = null;
+            try
+            {
+                enumerator = MessageChannel.Reader.ReadAllAsync(cancellationToken).GetAsyncEnumerator();
+                var unFlushedMessages = new ArraySegment<MessageHandle>(ArrayPool<MessageHandle>.Shared.Rent(bufferedMessages), 0, bufferedMessages);
+                
+                var unFlushedMessagesCount = 0;
+                try
+                {
+
+
+                    while (true)
+                    {
+                        var moveNext = enumerator.MoveNextAsync();
+                        if (moveNext.IsCompleted)
+                        {
+                            if (moveNext.Result)
+                            {
+                                var message = enumerator.Current;
+                                WriteMessage(Output, message.SerializedMessage);
+                                if (QueueMessage(unFlushedMessages, message, ref unFlushedMessagesCount))
+                                {
+                                    await Output.FlushAsync(cancellationToken);
+                                    SendComplete(unFlushedMessages);
+                                    unFlushedMessagesCount = 0;
+                                }
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            await Output.FlushAsync(cancellationToken);
+                            SendComplete(unFlushedMessages.AsSpan(..unFlushedMessagesCount));
+                            unFlushedMessagesCount = 0;
+                            if (await moveNext)
+                            {
+                                var message = enumerator.Current;
+                                WriteMessage(Output, message.SerializedMessage);
+                                if (QueueMessage(unFlushedMessages, message, ref unFlushedMessagesCount))
+                                {
+                                    await Output.FlushAsync(cancellationToken);
+                                    SendComplete(unFlushedMessages);
+                                    unFlushedMessagesCount = 0;
+                                }
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+
+
+                    }
+                }
+                finally
+                {
+                    ArrayPool<MessageHandle>.Shared.Return(unFlushedMessages.Array!, true);
+                }
+            }
+            finally
+            {
+                if (!(enumerator is null))
+                {
+                    await enumerator.DisposeAsync();
+                }
+            }
+            static bool QueueMessage(Span<MessageHandle> queuedHandles,MessageHandle newHandle,ref int count)
+            {
+                ref var dst = ref Unsafe.Add(ref MemoryMarshal.GetReference(queuedHandles), count++);
+                dst = newHandle;
+                return queuedHandles.Length == count;
+            }
+
+            static void SendComplete(ReadOnlySpan<MessageHandle> completedHandles)
+            {
+                for (int i = 0; i < completedHandles.Length; i++)
+                {
+                    completedHandles[i].SendComplete();
+                }
+            }
+
+        }
+        async ValueTask SendMessagesAsync(CancellationToken cancellationToken = default)
+        {
+            await foreach(var message in MessageChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                WriteMessage(Output, message.SerializedMessage);
+                var flushResult = await Output.FlushAsync(cancellationToken);
+                if (flushResult.IsCanceled)
+                {
+                    break;
+                }
+                message.SendComplete();
+            }
+        }
+        static void WriteMessage(PipeWriter writer, ReadOnlySpan<byte> serializedResponse)
+        {
+            var span = writer.GetSpan(Header.MaxHeaderSize + serializedResponse.Length);
+            var header = new Header(serializedResponse.Length);
+            var headerSize = header.Write(span);
+            serializedResponse.CopyTo(span[headerSize..]);
+            writer.Advance(headerSize + serializedResponse.Length);
+        }
+        async ValueTask ResolveMessagesAsync(CancellationToken cancellationToken = default)
         {
             await foreach (var message in ReadMessageSegmentsAsync(cancellationToken))
             {
-                var parseResult = MessageParser.ParseDuplexMessage(message);
-                switch (parseResult.MessageKind)
-                {
-                    case MessageKind.InvalidJson:
-                        {
-                            var response = ErrorResponse.ParseError(message);
-                            _ = Domain.ResponseAsync(JsonSerializer.SerializeUnsafe(response, JsonFormatterResolver).CopyToPooled());
-                            goto ReleaseMessage;
-                        }
-                    case MessageKind.InvalidMessage:
-                        {
-                            var response = ErrorResponse.InvalidRequest(message);
-                            _ = Domain.ResponseAsync(JsonSerializer.SerializeUnsafe(response, JsonFormatterResolver).CopyToPooled());
-                            goto ReleaseMessage;
-                        }
-                    case MessageKind.ClientMessage:
-                        {
-                            if(MethodEntries.TryGetValue(parseResult.Method,out var entry))
-                            {
-                                var parameters = parseResult.Params;
-                                var id = parseResult.id;
-                                _ = Task.Run(async() => 
-                                { 
-                                    var response = await entry.ResolveRequestAsync(parameters, id); 
-                                    ArrayPool<byte>.Shared.Return(message.Array!);
-                                    if (!(response.Array is null))
-                                    {
-                                        _ = Domain.ResponseAsync(response);
-                                    }
-                                    
-
-                                });
-                                break;
-                            }
-                            else
-                            {
-                                if(parseResult.id is ID reqID)
-                                {
-                                    var response = JsonSerializer.SerializeUnsafe(ErrorResponse.MethodNotFound(reqID, parseResult.Method.ToString())).CopyToPooled();
-                                    _ = Domain.ResponseAsync(response);
-                                }
-                                goto ReleaseMessage;
-                            }
-                        }
-                    case MessageKind.ResultResponse:
-                        {
-                            if (parseResult.id is ID id)
-                            {
-                                Domain.SetResult(id, parseResult.Result);
-                            }
-                            else
-                            {
-                                Debug.Fail("Result without id");
-                            }
-                            goto ReleaseMessage;
-
-                        }
-                    case MessageKind.ErrorResponse:
-                        {
-                            Domain.SetError(parseResult.id, parseResult.Error);
-                            goto ReleaseMessage;
-                        }
-                    ReleaseMessage:
-                        {
-                            ArrayPool<byte>.Shared.Return(message.Array!);
-                            break;
-                        }
-                }
+                _ = ResolveMessageAsync(message);
             }
         }
 
-        async IAsyncEnumerable<ArraySegment<byte>> ReadMessageSegmentsAsync([EnumeratorCancellation]CancellationToken cancellationToken)
+
+        async IAsyncEnumerable<ArraySegment<byte>> ReadMessageSegmentsAsync([EnumeratorCancellation]CancellationToken cancellationToken = default)
         {
             while (true)
             {
@@ -156,6 +198,8 @@ namespace RamType0.JsonRpc.Duplex
 
 
             }
+
+
             static bool TryFindHeaderEnd(ReadOnlySequence<byte> buffer, out SequencePosition headerTerminalOrNextSearchContinuation)
             {
                 var pos = buffer.PositionOf((byte)'\r');
@@ -173,7 +217,7 @@ namespace RamType0.JsonRpc.Duplex
                         Span<byte> headerEnd = stackalloc byte[4];
                         ReadOnlySequence<byte> headerEndSeq = crSlice.Slice(0, 4);
                         headerEndSeq.CopyTo(headerEnd);
-                        if (headerEnd.SequenceEqual(stackalloc byte[] { (byte)'\r', (byte)'\n', (byte)'\r', (byte)'\n', }))
+                        if (Unsafe.ReadUnaligned<uint>(ref MemoryMarshal.GetReference(headerEnd)) == (('\r') | ('\n' << 8) | ('\r' << 16) | ('\n' << 24)))
                         {
                             headerTerminalOrNextSearchContinuation = headerEndSeq.End;
                             return true;
@@ -221,5 +265,9 @@ namespace RamType0.JsonRpc.Duplex
 
         }
 
+
     }
+
+
+
 }

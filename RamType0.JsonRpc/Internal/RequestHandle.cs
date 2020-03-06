@@ -94,7 +94,7 @@ namespace RamType0.JsonRpc.Internal
             core.SetException(e);
         }
 
-        protected override void OnSendComplete()
+        private protected override void OnSendComplete()
         {
             return;
         }

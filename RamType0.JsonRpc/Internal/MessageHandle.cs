@@ -6,7 +6,7 @@ using System.Text;
 
 namespace RamType0.JsonRpc.Internal
 {
-    abstract class MessageHandle
+    public abstract class MessageHandle
     {
 
         public void SendComplete()
@@ -19,7 +19,7 @@ namespace RamType0.JsonRpc.Internal
 
         }
 
-        protected abstract void OnSendComplete();
+        private protected abstract void OnSendComplete();
 
         public abstract void SetException(Exception e);
 
