@@ -3,7 +3,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using Utf8Json;
 
-namespace RamType0.JsonRpc.Server
+namespace RamType0.JsonRpc.Protocol
 {
     public interface IResponseMessage : IMessage
     {
@@ -17,7 +17,7 @@ namespace RamType0.JsonRpc.Server
     }
 
     public interface IErrorResponse<T> : IErrorResponse
-        where T : notnull
+        //where T : notnull
     {
         [DataMember(Name = "error")]
         new ResponseError<T> Error { get; set; }
@@ -102,7 +102,7 @@ namespace RamType0.JsonRpc.Server
     }
 
     public struct ErrorResponse<T> : IErrorResponse<T>
-        where T : notnull
+        //where T : notnull
     {
         [DataMember(Name = "jsonrpc")]
         public JsonRpcVersion Version => default;
@@ -119,7 +119,6 @@ namespace RamType0.JsonRpc.Server
         }
     }
     public struct ResponseError<T>
-        where T : notnull
     {
         [DataMember(Name = "code")]
         public long Code { get; set; }

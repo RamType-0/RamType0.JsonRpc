@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Utf8Json;
 namespace RamType0.JsonRpc
 {
@@ -180,12 +181,17 @@ namespace RamType0.JsonRpc
             }
             private static void Serialize(ref JsonWriter writer, EscapedUTF8String value)
             {
-                writer.EnsureCapacity(value.Length);
-                foreach (var c in value.bytes)
-                {
-                    writer.WriteRawUnsafe(c);
-                }
-
+                var quotedLength = value.Length + 2;
+                writer.EnsureCapacity(quotedLength);
+                var dstBuffer = writer.GetBuffer().AsSpan();
+                ref var dstRef = ref MemoryMarshal.GetReference(dstBuffer);
+                dstRef = (byte)'"';
+                dstRef = Unsafe.AddByteOffset(ref dstRef, (IntPtr)1);
+                ref var srcRef = ref MemoryMarshal.GetReference(value.bytes.AsSpan());
+                Unsafe.CopyBlockUnaligned(ref dstRef,ref srcRef , (uint)value.Length);
+                dstRef = Unsafe.AddByteOffset(ref dstRef, (IntPtr)value.Length);
+                dstRef = (byte)'"';
+                writer.AdvanceOffset(quotedLength);
             }
             private static EscapedUTF8String? DeserializeNullableUnsafe(ref JsonReader reader)
             {

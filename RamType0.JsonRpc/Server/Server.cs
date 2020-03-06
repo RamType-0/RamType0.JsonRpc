@@ -9,6 +9,7 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc.Server
 {
+    using Protocol;
     public class Server
     {
         internal ConcurrentDictionary<EscapedUTF8String, RpcMethodEntry> RpcMethods { get; set; } = new ConcurrentDictionary<EscapedUTF8String, RpcMethodEntry>();

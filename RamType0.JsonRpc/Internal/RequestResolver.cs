@@ -11,6 +11,7 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc.Internal
 {
+    using Protocol;
     public sealed class RequestResolver
     {
         internal ConcurrentDictionary<EscapedUTF8String, RpcMethodEntry> RpcMethods { get; set; } = new ConcurrentDictionary<EscapedUTF8String, RpcMethodEntry>();
@@ -230,12 +231,12 @@ namespace RamType0.JsonRpc.Internal
                 {
                     if (RpcMethods.TryGetValue(name, out var entry))
                     {
-                        return entry.ResolveRequest(paramsSegment, id, formatterResolver);
+                        return entry.ResolveRequest(paramsSegment, id);
                     }
                     else
                     {
                         if (id is ID reqID)
-                            return JsonSerializer.SerializeUnsafe(ErrorResponse.MethodNotFound(reqID, name.ToString()));
+                            return JsonSerializer.SerializeUnsafe(ErrorResponse.MethodNotFound(reqID, name.ToString())).CopyToPooled();
                         else return default; ;
                     }
                 }
@@ -260,14 +261,14 @@ namespace RamType0.JsonRpc.Internal
                     var jsonTerminal = json.Offset + json.Count;
                     if (readerOffset >= jsonTerminal)
                     {
-                        return JsonSerializer.SerializeUnsafe(ErrorResponse.InvalidRequest(json));
+                        return JsonSerializer.SerializeUnsafe(ErrorResponse.InvalidRequest(json)).CopyToPooled();
                     }
                 }
                 catch (JsonParsingException)
                 {
 
                 }
-                return JsonSerializer.SerializeUnsafe(ErrorResponse.ParseError(json));
+                return JsonSerializer.SerializeUnsafe(ErrorResponse.ParseError(json)).CopyToPooled();
             }
 
         }

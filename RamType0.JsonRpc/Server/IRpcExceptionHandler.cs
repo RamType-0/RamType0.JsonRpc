@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 
 namespace RamType0.JsonRpc.Server
 {
+    using Protocol;
     public interface IRpcExceptionHandler
     {
         public ValueTask OnException(Server server, ID? id, Exception exception);

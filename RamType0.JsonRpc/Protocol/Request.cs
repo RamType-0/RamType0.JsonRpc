@@ -4,15 +4,16 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc.Client
 {
+    using Protocol;
     public struct Request<T>
-        where T : notnull, IMethodParams
+        //where T : notnull, IMethodParams
     {
         [JsonFormatter(typeof(JsonRpcVersion.Formatter))]
         [DataMember(Name = "jsonrpc")]
         public JsonRpcVersion Version => default;
-        [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp.Nullable))]
+        [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp))]
         [DataMember(Name = "method")]
-        public string Method { get; set; }
+        public EscapedUTF8String Method { get; set; }
         [DataMember(Name = "params")]
         public T Params { get; set; }
         [DataMember(Name = "id")]
@@ -20,52 +21,17 @@ namespace RamType0.JsonRpc.Client
     }
 
     public struct Notification<T>
-        where T : notnull, IMethodParams
+        //where T : notnull, IMethodParams
     {
         [JsonFormatter(typeof(JsonRpcVersion.Formatter))]
         [DataMember(Name = "jsonrpc")]
         public JsonRpcVersion Version => default;
-        [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp.Nullable))]
+        [JsonFormatter(typeof(EscapedUTF8String.Formatter.Temp))]
         [DataMember(Name = "method")]
-        public string Method { get; set; }
+        public EscapedUTF8String Method { get; set; }
         [DataMember(Name = "params")]
         public T Params { get; set; }
     }
-
-
-    /// <summary>
-    /// レスポンスのデシリアライズ用の構造体。レスポンスのフォーマットが不正のときに関する仕様がないため、特にハンドリングしていない・・・
-    /// </summary>
-    public struct ResponseMessage
-    {
-        //[DataMember(Name = "jsonrpc")]
-        //public JsonRpcVersion Version { get; set; }
-        //[DataMember(Name = "result")]
-        //public object? Result { get; set; }
-        [DataMember(Name = "id")]
-        [JsonFormatter(typeof(ID.Formatter.Nullable))]
-        public ID? ID { get; set; }
-        //[DataMember(Name = "error")]
-        //public ResponseError<object?>? Error { get; set; }
-    }
-
-    public struct ErrorResponseMessage
-    {
-        [DataMember(Name = "error")]
-        public ResponseError<object?>? Error { get; set; }
-    }
-
-    public struct Response<T>
-    {
-        [DataMember(Name = "result")]
-        public T Result { get; set; }
-        [DataMember(Name = "id")]
-        [JsonFormatter(typeof(ID.Formatter.Nullable))]
-        public ID ID { get; set; }
-        [DataMember(Name = "error")]
-        public ResponseError<object?>? Error { get; set; }
-    }
-
 
 
     public sealed class DefaultResponseErrorHandler : IResponseErrorHandler
@@ -99,17 +65,6 @@ namespace RamType0.JsonRpc.Client
             return FromPreDefinedError(error) ?? new ResponseErrorException<T>(error);
         }
     }
-    public struct ResponseError<T>
-    {
-        [DataMember(Name = "code")]
-        public long Code { get; set; }
-        [DataMember(Name = "message")]
-        public string Message { get; set; }
-        [DataMember(Name = "data")]
-        public T Data { get; set; }
-
-    }
-
     [System.Serializable]
     public class ResponseErrorException<T> : System.IO.IOException
     {

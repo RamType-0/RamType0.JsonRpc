@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 namespace RamType0.JsonRpc.Server
 {
+    using Protocol;
 
     /// <summary>
     /// 最終的な<see cref="IResponseMessage"/>の出力を行うクラスを示します。
@@ -47,7 +48,7 @@ namespace RamType0.JsonRpc.Server
         /// <typeparam name="TResponse"></typeparam>
         /// <typeparam name="TError"></typeparam>
         /// <param name="response"></param>
-        public ValueTask ResponseException<T>(Server server, T response) where T : notnull, IErrorResponse<Exception>
+        public ValueTask ResponseException<T>(Server server, T response) where T : IErrorResponse<Exception>
         {
             return ResponseError(server,response);
         }

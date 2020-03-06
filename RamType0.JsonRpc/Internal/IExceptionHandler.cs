@@ -5,6 +5,7 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc.Internal
 {
+    using Protocol;
     using Server;
     public interface IExceptionHandler
     {

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace RamType0.JsonRpc.Server
 {
-
+    using Protocol;
     public interface IRpcMethodProxy<TDelegate, in TParams>
         where TDelegate : Delegate
         where TParams : IMethodParams

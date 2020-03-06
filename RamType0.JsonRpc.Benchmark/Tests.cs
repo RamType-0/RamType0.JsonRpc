@@ -41,7 +41,7 @@ namespace RamType0.JsonRpc.Benchmark
             server.Register("Hello", RpcMethodEntry.FromDelegate(new Action(EmptyAction)));
 
             resolver = new Internal.RequestResolver();
-            resolver.TryRegister("Hello", Internal.RpcMethodEntry.FromDelegate(new Action(EmptyAction)));
+            resolver.TryRegister("Hello", (Internal.RpcMethodEntry)Internal.RpcMethodEntry.FromDelegate(new Action(EmptyAction)));
             requestJson = Encoding.UTF8.GetBytes("{\"jsonrpc\":\"2.0\",\"method\":\"Hello\",\"id\":1}");
             //var stream = new NamedPipeClientStream("StreamJsonRpc");
             //stream.Connect();

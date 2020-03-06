@@ -7,17 +7,17 @@ namespace RamType0.JsonRpc.Marshaling
 {
     public interface IMessageWriter
     {
-        void WriteResponse(PipeWriter writer,ReadOnlySpan<byte> serializedResponse);
+        void WriteMessage(PipeWriter writer,ReadOnlySpan<byte> serializedMessage);
         /// <summary>
-        /// 戻り値の<see cref="ValueTask"/>が完了、または例外をスローした時点で<paramref name="serializedResponse"/>は利用できなくなります。必要な場合、事前にコピーしてください。
+        /// 戻り値の<see cref="ValueTask"/>が完了、または例外をスローした時点で<paramref name="serializedMessage"/>は利用できなくなります。必要な場合、事前にコピーしてください。
         /// </summary>
         /// <param name="writer"></param>
-        /// <param name="serializedResponse"></param>
+        /// <param name="serializedMessage"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        ValueTask WriteResponseAsync(PipeWriter writer, ReadOnlyMemory<byte> serializedResponse,CancellationToken cancellationToken = default)
+        ValueTask WriteMessageAsync(PipeWriter writer, ReadOnlyMemory<byte> serializedMessage,CancellationToken cancellationToken = default)
         {
-            WriteResponse(writer, serializedResponse.Span);
+            WriteMessage(writer, serializedMessage.Span);
             return new ValueTask();
         }
     }

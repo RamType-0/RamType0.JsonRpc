@@ -8,6 +8,7 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc.Client
 {
+    using Protocol;
     public class Client
     {
         public bool TryResolveResponse(ArraySegment<byte> json)
@@ -321,16 +322,18 @@ namespace RamType0.JsonRpc.Client
     {
         public Client Client { get; }
         public string MethodName { get; }
+        EscapedUTF8String EscapedMethodName { get; }
         public RequestObjectSource(Client client, string name)
         {
             Client = client;
             MethodName = name;
+            EscapedMethodName = EscapedUTF8String.FromUnEscaped(name);
         }
         protected async ValueTask<TResult> RequestAsync<TParams, TResult>(TParams parameters)
             where TParams : IMethodParams
 
         {
-            var request = new Request<TParams>() { ID = Client.GetUniqueID(), Method = MethodName, Params = parameters };
+            var request = new Request<TParams>() { ID = Client.GetUniqueID(), Method = EscapedMethodName, Params = parameters };
             var completion = RequestCompletionSource<TResult>.Get();
             Client.UnResponsedRequests.TryAdd(request.ID, completion);
             await Client.Output.SendRequestAsync(Client, request).ConfigureAwait(false);
@@ -341,7 +344,7 @@ namespace RamType0.JsonRpc.Client
             where TParams : IMethodParams
 
         {
-            var request = new Request<TParams>() { ID = Client.GetUniqueID(), Method = MethodName, Params = parameters };
+            var request = new Request<TParams>() { ID = Client.GetUniqueID(), Method = EscapedMethodName, Params = parameters };
             var completion = RequestCompletionSource<NullResult>.Get();
             Client.UnResponsedRequests.TryAdd(request.ID, completion);
             await Client.Output.SendRequestAsync(Client, request).ConfigureAwait(false);
@@ -361,7 +364,7 @@ namespace RamType0.JsonRpc.Client
         protected ValueTask Notify<TParams>(TParams parameters)
             where TParams : IMethodParams
         {
-            var notification = new Notification<TParams>() { Method = MethodName, Params = parameters };
+            var notification = new Notification<TParams>() { Method = EscapedMethodName, Params = parameters };
             return Client.Output.SendNotification(Client, notification);
         }
     }

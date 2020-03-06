@@ -8,19 +8,21 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc.Duplex
 {
+    using Protocol;
+    using Client;
     /// <summary>
     /// 単一の入力でクライアント、サーバー双方の通信を取り持つクラスです。
     /// </summary>
     public sealed class Connection
     {
-        public Connection(Server.Server server, Client.Client client)
+        public Connection(Server.Server server, Client client)
         {
             Server = server;
             Client = client;
         }
 
         public Server.Server Server { get; }
-        public Client.Client Client { get; }
+        public Client Client { get; }
         public ValueTask ResolveAsync(ArraySegment<byte> json)
         {
             var reader = new JsonReader(json.Array!, json.Offset);
@@ -39,7 +41,7 @@ namespace RamType0.JsonRpc.Duplex
                 ID? id = null;
                 ArraySegment<byte> paramsSegment = default;
                 ArraySegment<byte> resultSegment = default;
-                Client.ResponseError<object?>? _error = null;
+                ResponseError<object?>? _error = null;
                 while (true)
                 {
                     try
@@ -76,7 +78,7 @@ namespace RamType0.JsonRpc.Duplex
                                         resultSegment = reader.ReadNextBlockSegment();
                                     }else if (propertySegmentSpan.SequenceEqual(errorSpan))
                                     {
-                                        _error = Client.JsonResolver.GetFormatterWithVerify<Client.ResponseError<object?>>().Deserialize(ref reader, Client.JsonResolver);
+                                        _error = Client.JsonResolver.GetFormatterWithVerify<ResponseError<object?>>().Deserialize(ref reader, Client.JsonResolver);
                                     }
 
                                     if (reader.ReadIsEndObject())
@@ -138,7 +140,7 @@ namespace RamType0.JsonRpc.Duplex
                         {
                             try
                             {
-                                if (_error is Client.ResponseError<object?> error)
+                                if (_error is ResponseError<object?> error)
                                 {
                                     req.SetException(Client.ErrorHandler.AsException<object>(error));
                                 }
@@ -159,7 +161,7 @@ namespace RamType0.JsonRpc.Duplex
                     }
                     else
                     {
-                        if (_error is Client.ResponseError<object?> error)
+                        if (_error is ResponseError<object?> error)
                         {
                             Client.UnIdentifiableErrors.Add(error);
                         }
@@ -208,7 +210,7 @@ namespace RamType0.JsonRpc.Duplex
                 EscapedUTF8String? methodName = null;
                 ID? _id = null;
                 ArraySegment<byte> paramsSegment = default;
-                Client.ResponseError<object?>? _error = null;
+                ResponseError<object?>? _error = null;
                 ArraySegment<byte> resultSegment = default;
                 try
                 {
@@ -444,7 +446,7 @@ namespace RamType0.JsonRpc.Duplex
                                     reader.AdvanceOffset(7);
                                     if (reader.ReadIsNameSeparator())
                                     {
-                                        _error = Client.JsonResolver.GetFormatterWithVerify<Client.ResponseError<object?>>().Deserialize(ref reader, Client.JsonResolver);
+                                        _error = Client.JsonResolver.GetFormatterWithVerify<ResponseError<object?>>().Deserialize(ref reader, Client.JsonResolver);
                                         break;
                                     }
                                     else
@@ -502,7 +504,7 @@ namespace RamType0.JsonRpc.Duplex
                         {
                             try
                             {
-                                if (_error is Client.ResponseError<object?> error)
+                                if (_error is ResponseError<object?> error)
                                 {
                                     req.SetException(Client.ErrorHandler.AsException<object>(error));
                                 }
@@ -523,7 +525,7 @@ namespace RamType0.JsonRpc.Duplex
                     }
                     else
                     {
-                        if (_error is Client.ResponseError<object?> error)
+                        if (_error is ResponseError<object?> error)
                         {
                             Client.UnIdentifiableErrors.Add(error);
                         }

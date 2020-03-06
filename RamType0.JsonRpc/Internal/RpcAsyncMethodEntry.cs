@@ -8,11 +8,25 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc.Internal
 {
+    using Protocol;
+    using Utf8Json.Resolvers;
+
     public abstract class RpcAsyncMethodEntry
     {
-        public abstract ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver);
-        public ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> serializedParameters, ID? id, IJsonFormatterResolver readWriteFormatterResolver) => ResolveRequestAsync(serializedParameters, id, readWriteFormatterResolver, readWriteFormatterResolver);
+        protected RpcAsyncMethodEntry():this(StandardResolver.CamelCase,StandardResolver.ExcludeNullCamelCase)
+        {
 
+        }
+        protected RpcAsyncMethodEntry(IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver)
+        {
+            ReadFormatterResolver = readFormatterResolver;
+            WriteFormatterResolver = writeFormatterResolver;
+        }
+
+        public IJsonFormatterResolver ReadFormatterResolver { get; set; }
+        public IJsonFormatterResolver WriteFormatterResolver { get; set; }
+        public abstract ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> serializedParameters, ID? id);
+    
     }
     sealed class RpcAsyncMethodEntry<TMethod, TParams, TResult, TDeserializer, TModifier> : RpcAsyncMethodEntry
         where TMethod : notnull, IRpcAsyncMethodBody<TParams, TResult>
@@ -34,7 +48,7 @@ namespace RamType0.JsonRpc.Internal
 
         public IExceptionHandler ExceptionHandler { get; set; }
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        public override sealed async ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> parametersSegment, ID? id, IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver)
+        public override sealed async ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> parametersSegment, ID? id)
         {
 
             TParams parameters;
@@ -52,13 +66,13 @@ namespace RamType0.JsonRpc.Internal
 
             try
             {
-                parameters = deserializer.Deserialize(ref reader, readFormatterResolver);
+                parameters = deserializer.Deserialize(ref reader, ReadFormatterResolver);
             }
             catch (JsonParsingException)
             {
                 if (id is ID reqID)
                 {
-                    return JsonSerializer.SerializeUnsafe(ErrorResponse.InvalidParams(reqID, Encoding.UTF8.GetString(parametersSegment)), writeFormatterResolver);
+                    return JsonSerializer.SerializeUnsafe(ErrorResponse.InvalidParams(reqID, Encoding.UTF8.GetString(parametersSegment)), WriteFormatterResolver);
                 }
                 else
                 {
@@ -69,12 +83,12 @@ namespace RamType0.JsonRpc.Internal
             TResult result;
             try
             {
-                modifier.Modify(ref parameters, parametersSegment, id, readFormatterResolver);
+                modifier.Modify(ref parameters, parametersSegment, id, ReadFormatterResolver);
                 result = await method.InvokeAsync(parameters);
             }
             catch (Exception e)
             {
-                return ExceptionHandler.Handle(e, parametersSegment, id, readFormatterResolver, writeFormatterResolver);
+                return ExceptionHandler.Handle(e, parametersSegment, id, ReadFormatterResolver, WriteFormatterResolver);
 
             }
             {
@@ -82,11 +96,11 @@ namespace RamType0.JsonRpc.Internal
                 {
                     if (result is null)
                     {
-                        return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, new NullResult()), writeFormatterResolver);
+                        return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, new NullResult()), WriteFormatterResolver);
                     }
                     else
                     {
-                        return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, result), writeFormatterResolver);
+                        return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, result), WriteFormatterResolver);
                     }
 
 
@@ -120,7 +134,7 @@ namespace RamType0.JsonRpc.Internal
 
         public IExceptionHandler ExceptionHandler { get; set; }
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        public override sealed async ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> parametersSegment, ID? id, IJsonFormatterResolver readFormatterResolver, IJsonFormatterResolver writeFormatterResolver)
+        public override sealed async ValueTask<ArraySegment<byte>> ResolveRequestAsync(ArraySegment<byte> parametersSegment, ID? id)
         {
 
             TParams parameters;
@@ -138,13 +152,13 @@ namespace RamType0.JsonRpc.Internal
 
             try
             {
-                parameters = deserializer.Deserialize(ref reader, readFormatterResolver);
+                parameters = deserializer.Deserialize(ref reader, ReadFormatterResolver);
             }
             catch (JsonParsingException)
             {
                 if (id is ID reqID)
                 {
-                    return JsonSerializer.SerializeUnsafe(ErrorResponse.InvalidParams(reqID, Encoding.UTF8.GetString(parametersSegment)), writeFormatterResolver);
+                    return JsonSerializer.SerializeUnsafe(ErrorResponse.InvalidParams(reqID, Encoding.UTF8.GetString(parametersSegment)), WriteFormatterResolver).CopyToPooled();
                 }
                 else
                 {
@@ -154,18 +168,18 @@ namespace RamType0.JsonRpc.Internal
             }
             try
             {
-                modifier.Modify(ref parameters, parametersSegment, id, readFormatterResolver);
+                modifier.Modify(ref parameters, parametersSegment, id, ReadFormatterResolver);
                 await method.InvokeAsync(parameters);
             }
             catch (Exception e)
             {
-                return ExceptionHandler.Handle(e, parametersSegment, id, readFormatterResolver, writeFormatterResolver);
+                return ExceptionHandler.Handle(e, parametersSegment, id, ReadFormatterResolver, WriteFormatterResolver).CopyToPooled();
 
             }
             {
                 if (id is ID requestID)
                 {
-                    return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, new NullResult()), writeFormatterResolver);
+                    return JsonSerializer.SerializeUnsafe(ResultResponse.Create(requestID, new NullResult()), WriteFormatterResolver).CopyToPooled();
                 }
                 else
                 {

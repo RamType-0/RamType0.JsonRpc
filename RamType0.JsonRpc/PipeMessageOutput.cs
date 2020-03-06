@@ -14,6 +14,7 @@ using System.Threading;
 namespace RamType0.JsonRpc
 {
     using Marshaling;
+    using Internal;
     public class PipeMessageOutput<T> : IDuplexOutput
         where T: notnull,IMessageWriter
     {
@@ -21,17 +22,17 @@ namespace RamType0.JsonRpc
         public PipeMessageOutput(T writer,PipeWriter outputPipe)
         {
             this.writer = writer;
-            Responses = Channel.CreateUnbounded<SendMessageCompletionSource>(new UnboundedChannelOptions() { AllowSynchronousContinuations = false, SingleReader = true, SingleWriter = false });
+            Responses = Channel.CreateUnbounded<SendMessageHandle>(new UnboundedChannelOptions() { AllowSynchronousContinuations = false, SingleReader = true, SingleWriter = false });
             OutputPipe = outputPipe;
         }
-        Channel<SendMessageCompletionSource> Responses { get; }
+        Channel<SendMessageHandle> Responses { get; }
         PipeWriter OutputPipe { get; }
 
         
         public async ValueTask StartOutputAsync(CancellationToken cancellationToken = default)
         {
 
-            IAsyncEnumerator<SendMessageCompletionSource>? enumerator = null;
+            IAsyncEnumerator<SendMessageHandle>? enumerator = null;
             try
             {
                 enumerator = Responses.Reader.ReadAllAsync(cancellationToken).GetAsyncEnumerator();
@@ -74,14 +75,14 @@ namespace RamType0.JsonRpc
             }
         }
 
-        void WriteResponse(SendMessageCompletionSource source)
+        void WriteResponse(SendMessageHandle source)
         {
-            var serializedResponse = source.SerializedResponse;
+            var serializedResponse = source.SerializedMessage;
             var span = serializedResponse.AsSpan();
             try
             {
-                writer.WriteResponse(OutputPipe, span);
-                source.SetComplete();
+                writer.WriteMessage(OutputPipe, span);
+                source.SendComplete();
             }
             catch (Exception e)
             {
@@ -90,34 +91,26 @@ namespace RamType0.JsonRpc
         }
         ValueTask IResponseOutput.ResponseAsync<TResponse>(Server.Server server, TResponse response)
         {
-            var tmp = JsonSerializer.SerializeUnsafe(response);
-            var source = SendMessageCompletionSource.Create(tmp);
+            var tmp = JsonSerializer.SerializeUnsafe(response).CopyToPooled();
+            var source = SendMessageHandle.Create(tmp);
             _ = Responses.Writer.WriteAsync(source);
             return source.Task;
         }
         ValueTask IRequestOutput.SendRequestAsync<TParams>(Client.Client client, Request<TParams> request)
         {
-            var tmp = JsonSerializer.SerializeUnsafe(request);
-            var source = SendMessageCompletionSource.Create(tmp);
+            var tmp = JsonSerializer.SerializeUnsafe(request).CopyToPooled();
+            var source = SendMessageHandle.Create(tmp);
             _ = Responses.Writer.WriteAsync(source);
             return source.Task;
         }
 
         ValueTask IRequestOutput.SendNotification<TParams>(Client.Client client, Notification<TParams> notification)
         {
-            var tmp = JsonSerializer.SerializeUnsafe(notification);
-            var source = SendMessageCompletionSource.Create(tmp);
+            var tmp = JsonSerializer.SerializeUnsafe(notification).CopyToPooled();
+            var source = SendMessageHandle.Create(tmp);
             _ = Responses.Writer.WriteAsync(source);
             return source.Task;
         }
     }
 
-    public struct PassThroughWriter : IMessageWriter
-    {
-        public void WriteResponse(PipeWriter writer,ReadOnlySpan<byte> serializedResponse)
-        {
-            serializedResponse.CopyTo(writer.GetSpan(serializedResponse.Length));
-            writer.Advance(serializedResponse.Length);
-        }
-    }
 }

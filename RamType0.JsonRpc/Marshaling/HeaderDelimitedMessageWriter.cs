@@ -7,7 +7,7 @@ namespace RamType0.JsonRpc.Marshaling
 {
     public readonly struct HeaderDelimitedMessageWriter : IMessageWriter
     {
-        public void WriteResponse(PipeWriter writer, ReadOnlySpan<byte> serializedResponse)
+        public void WriteMessage(PipeWriter writer, ReadOnlySpan<byte> serializedResponse)
         {
             var span = writer.GetSpan(Header.MaxHeaderSize + serializedResponse.Length);
             var header = new Header(serializedResponse.Length);
