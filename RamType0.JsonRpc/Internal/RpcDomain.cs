@@ -37,12 +37,8 @@ namespace RamType0.JsonRpc.Internal
         }
 
 
-        /// <summary>
-        /// メッセージを非同期で解決します。このメソッドはスレッドセーフであり、非同期での解決完了を待つことなく他のメッセージの解決を行うことができます。
-        /// </summary>
-        /// <param name="message">メッセージの解決完了を表す<see cref="ValueTask"/>。この<see cref="ValueTask"/>の完了を待つことなく、他のメッセージの解決を開始することができます。</param>
-        /// <returns></returns>
-        public ValueTask ResolveMessageAsync(ArraySegment<byte> message)
+        
+        public ValueTask __ResolveMessageAsync(ArraySegment<byte> message)
         {
             ValueTask task;
             var parseResult = MessageParser.ParseDuplexMessage(message);
@@ -126,6 +122,94 @@ namespace RamType0.JsonRpc.Internal
                     }
             }
             return task;
+        }
+        /// <summary>
+        /// メッセージを非同期で解決します。このメソッドはスレッドセーフであり、非同期での解決完了を待つことなく他のメッセージの解決を行うことができます。
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns>メッセージの解決完了を表す<see cref="ValueTask"/>。この<see cref="ValueTask"/>の完了を待つことなく、他のメッセージの解決を開始することができます。</returns>
+        public async ValueTask ResolveMessageAsync(ArraySegment<byte> message)
+        {
+            var parseResult = MessageParser.ParseDuplexMessage(message);
+            var messageKind = parseResult.MessageKind;
+            switch (messageKind)
+            {
+                case MessageKind.InvalidJson:
+                    {
+                        var response = ErrorResponse.ParseError(message);
+                        var serializedResponse = JsonSerializer.SerializeUnsafe(response, JsonFormatterResolver).CopyToPooled();
+                        ArrayPool<byte>.Shared.Return(message.Array!);
+                        await ResponseAsync(serializedResponse);
+                        
+                        return;
+                    }
+                case MessageKind.InvalidMessage:
+                    {
+                        var response = ErrorResponse.InvalidRequest(message);
+                        var serializedResponse = JsonSerializer.SerializeUnsafe(response, JsonFormatterResolver).CopyToPooled();
+                        ArrayPool<byte>.Shared.Return(message.Array!);
+                        await ResponseAsync(serializedResponse);
+                        return;
+                    }
+                case MessageKind.ClientMessage:
+                    {
+                        if (MethodEntries.TryGetValue(parseResult.Method, out var entry))
+                        {
+                            var parameters = parseResult.Params;
+                            var id = parseResult.id;
+                            
+                            var response = await entry.ResolveRequestAsync(parameters, id);
+                            ArrayPool<byte>.Shared.Return(message.Array!);
+                            if (!(response.Array is null))
+                            {
+                                    await ResponseAsync(response);
+                            }
+                            return;
+
+                            
+                            
+                        }
+                        else
+                        {
+                            if (parseResult.id is ID reqID)
+                            {
+                                var response = JsonSerializer.SerializeUnsafe(ErrorResponse.MethodNotFound(reqID, parseResult.Method.ToString())).CopyToPooled();
+                                ArrayPool<byte>.Shared.Return(message.Array!);
+                                await ResponseAsync(response);
+                            }
+                            else
+                            {
+                                ArrayPool<byte>.Shared.Return(message.Array!);
+                            }
+                            return;
+                        }
+                    }
+                case MessageKind.ResultResponse:
+                    {
+                        if (parseResult.id is ID id)
+                        {
+                            SetResult(id, parseResult.Result);
+                        }
+                        else
+                        {
+                            Debug.Fail("Result without id");
+                        }
+                        ArrayPool<byte>.Shared.Return(message.Array!);
+                        return;
+
+                    }
+                case MessageKind.ErrorResponse:
+                    {
+                        SetError(parseResult.id, parseResult.Error);
+                        ArrayPool<byte>.Shared.Return(message.Array!);
+                        return;
+                    }
+                default:
+                    {
+                        Debug.Fail($"Unknown {nameof(MessageKind)}:{messageKind.ToString()}");
+                        return;
+                    }
+            }
         }
 
         ConcurrentDictionary<long, RequestHandle> UnResponsedRequests { get; } = new ConcurrentDictionary<long, RequestHandle>();

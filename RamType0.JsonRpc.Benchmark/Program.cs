@@ -33,7 +33,7 @@ namespace RamType0.JsonRpc.Benchmark
                 tests.ResolveRequestParallelServer();
             }
             */
-            BenchmarkRunner.Run<Tests>();
+            BenchmarkRunner.Run<VSStreamJsonRpc>();
         }
     }
 }

@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-
+using ValueTaskSupplement;
 namespace RamType0.JsonRpc.Marshaling
 {
     public sealed class PipeIOHeaderDelimitedRpcDomain : RpcDomain
@@ -23,14 +23,16 @@ namespace RamType0.JsonRpc.Marshaling
 
         public ValueTask StartAsync(CancellationToken cancellationToken = default)
         {
-            var resolve = Task.Run(async () => await ResolveMessagesAsync(cancellationToken));
+
+            var resolve = ResolveMessagesAsync(cancellationToken);
             //var send = Task.Run(async () => await SendMessagesAsync(cancellationToken));
-            var send = Task.Run(async () => await SendMessagesAsyncThroughPut(65536,cancellationToken));
-            return new ValueTask(Task.WhenAll(resolve, send));
+            var send = SendMessagesAsyncThroughPut(65536, cancellationToken);
+            return ValueTaskEx.WhenAll(resolve, send);
         }
 
         async ValueTask SendMessagesAsyncThroughPut(int bufferedMessages = 32, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
             IAsyncEnumerator<MessageHandle>? enumerator = null;
             try
             {
@@ -118,6 +120,7 @@ namespace RamType0.JsonRpc.Marshaling
         }
         async ValueTask SendMessagesAsync(CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
             await foreach(var message in MessageChannel.Reader.ReadAllAsync(cancellationToken))
             {
                 WriteMessage(Output, message.SerializedMessage);
@@ -139,6 +142,7 @@ namespace RamType0.JsonRpc.Marshaling
         }
         async ValueTask ResolveMessagesAsync(CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
             await foreach (var message in ReadMessageSegmentsAsync(cancellationToken))
             {
                 _ = ResolveMessageAsync(message);
