@@ -159,12 +159,12 @@ namespace RamType0.JsonRpc
             }
             
         }
-        public ValueTask RequestAsync<TParams>(EscapedUTF8String methodName, TParams parameters, IJsonFormatterResolver formatterResolver, IErrorHandler errorHandler,CancellationToken cancellationToken = default)
+        internal ValueTask RequestAsync<TParams>(EscapedUTF8String methodName, TParams parameters, IJsonFormatterResolver formatterResolver, IErrorHandler errorHandler,CancellationToken cancellationToken = default)
         {
             var handle = RequestAsyncCore<TParams, NullResult>(methodName, parameters, formatterResolver, errorHandler,cancellationToken);
             return handle.TaskVoid;
         }
-        public ValueTask<TResult> RequestAsync<TParams, TResult>(EscapedUTF8String methodName, TParams parameters, IJsonFormatterResolver formatterResolver, IErrorHandler errorHandler,CancellationToken cancellationToken = default)
+        internal ValueTask<TResult> RequestAsync<TParams, TResult>(EscapedUTF8String methodName, TParams parameters, IJsonFormatterResolver formatterResolver, IErrorHandler errorHandler,CancellationToken cancellationToken = default)
         {
             var handle = RequestAsyncCore<TParams, TResult>(methodName, parameters, formatterResolver, errorHandler,cancellationToken);
             return handle.Task;
@@ -194,14 +194,14 @@ namespace RamType0.JsonRpc
         {
             cancellationToken.Register(() => _ = NotifyAsync(CancelParams.CancellationMethodName, new CancelParams() { id = id }, StandardResolver.CamelCase));
         }
-        public ValueTask NotifyAsync<TParams>(EscapedUTF8String methodName, TParams parameters, IJsonFormatterResolver formatterResolver)
+        internal ValueTask NotifyAsync<TParams>(EscapedUTF8String methodName, TParams parameters, IJsonFormatterResolver formatterResolver)
         {
             var serializedNotification = JsonSerializer.SerializeUnsafe(new Notification<TParams>() { Method = methodName, Params = parameters }, formatterResolver).CopyToPooled();
             var handle = SendMessageHandle.Create(serializedNotification);
             _ = MessageChannel.Writer.WriteAsync(handle);
             return handle.Task;
         }
-        public void SetResult(ID id, ArraySegment<byte> resultJson)
+        internal void SetResult(ID id, ArraySegment<byte> resultJson)
         {
             if (id.Number is long num && UnResponsedRequests.TryGetValue(num, out var handle))
             {
@@ -213,7 +213,7 @@ namespace RamType0.JsonRpc
             }
 
         }
-        public void SetError(ID? id, ArraySegment<byte> errorSegment)
+        internal void SetError(ID? id, ArraySegment<byte> errorSegment)
         {
             if (id is ID reqID && reqID.Number is long num && UnResponsedRequests.TryGetValue(num, out var handle))
             {
