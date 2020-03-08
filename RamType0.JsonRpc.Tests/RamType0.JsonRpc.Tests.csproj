@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RamType0.JsonRpc\RamType0.JsonRpc.csproj" />
+    <ProjectReference Include="..\RamType0.JsonRpc.HeaderDelimitedIO\RamType0.JsonRpc.HeaderDelimitedIO.csproj" />
   </ItemGroup>
 
 </Project>

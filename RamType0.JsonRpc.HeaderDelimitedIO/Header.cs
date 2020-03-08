@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 
-namespace RamType0.JsonRpc.Marshaling
+namespace RamType0.JsonRpc.HeaderDelimitedIO
 {
     public readonly struct Header
     {

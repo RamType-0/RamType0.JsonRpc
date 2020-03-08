@@ -20,7 +20,7 @@ namespace RamType0.JsonRpc.Internal
                 case 0:
                     return 0;
                 case 1:
-                    return Unsafe.ReadUnaligned<byte>(ref spanRef).GetHashCode();
+                    return spanRef.GetHashCode();
                 case 2:
                     return GetElementUnsafeAs<ushort>(ref spanRef).GetHashCode();
                 case 3:
@@ -35,8 +35,8 @@ namespace RamType0.JsonRpc.Internal
                     return GetElementUnsafeAs<ulong>(ref spanRef).GetHashCode();
                 default:
                     var hash = (uint)((GetElementUnsafeAs<ulong>(ref spanRef) ^ GetElementUnsafeAs<ulong>(ref spanRef, length - 8)).GetHashCode());
-                    var shifts = length & 31;
-                    return (int)BitOperations.RotateRight(hash, shifts);
+                    var offset = length & 31;
+                    return (int)BitOperations.RotateRight(hash, offset);
             }
         }
         /// <summary>

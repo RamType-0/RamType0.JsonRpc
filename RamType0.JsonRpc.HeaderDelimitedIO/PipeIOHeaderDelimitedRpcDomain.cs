@@ -6,8 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using ValueTaskSupplement;
-namespace RamType0.JsonRpc.Marshaling
+namespace RamType0.JsonRpc.HeaderDelimitedIO
 {
     public class PipeIOHeaderDelimitedRpcDomain : RpcDomain
     {
