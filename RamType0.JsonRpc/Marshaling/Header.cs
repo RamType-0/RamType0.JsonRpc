@@ -35,15 +35,15 @@ namespace RamType0.JsonRpc.Marshaling
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal int WriteUnsafe(ref byte bufferRef)
         {
-           // ref byte bufferRef = ref MemoryMarshal.GetReference(buffer);
+            // ref byte bufferRef = ref MemoryMarshal.GetReference(buffer);
             ReadOnlySpan<byte> contentLengthHeader = stackalloc byte[] { (byte)'C', (byte)'o', (byte)'n', (byte)'t', (byte)'e', (byte)'n', (byte)'t', (byte)'-', (byte)'L', (byte)'e', (byte)'n', (byte)'g', (byte)'t', (byte)'h', (byte)':', (byte)' ', };
             ref var headerRef = ref MemoryMarshal.GetReference(contentLengthHeader);
             Unsafe.WriteUnaligned(ref bufferRef, Unsafe.ReadUnaligned<Vector128<byte>>(ref headerRef));
             //Unsafe.CopyBlockUnaligned(ref bufferRef, ref headerRef, ContentLengthHeaderSize);
             bufferRef = ref Unsafe.AddByteOffset(ref bufferRef, (IntPtr)ContentLengthHeaderSize);
-            System.Buffers.Text.Utf8Formatter.TryFormat(contentLength, MemoryMarshal.CreateSpan(ref bufferRef,10), out var intChars);
+            System.Buffers.Text.Utf8Formatter.TryFormat(contentLength, MemoryMarshal.CreateSpan(ref bufferRef, 10), out var intChars);
             const uint crlfcrlf = ('\r') | ('\n' << 8) | ('\r' << 16) | ('\n' << 24);
-            Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref bufferRef, (IntPtr)intChars),crlfcrlf);
+            Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref bufferRef, (IntPtr)intChars), crlfcrlf);
             const int Offset = ContentLengthHeaderSize + CRLFCRLFSize;
             return (Offset + intChars);//Content-Length: (contentLength)CRLFCRLF
         }

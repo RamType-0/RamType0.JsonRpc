@@ -1,6 +1,4 @@
-﻿using RamType0.JsonRpc.Internal;
-using RamType0.JsonRpc.Marshaling;
-using System;
+﻿using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO.Pipelines;
@@ -11,34 +9,33 @@ using System.Threading.Tasks;
 using ValueTaskSupplement;
 namespace RamType0.JsonRpc.Marshaling
 {
-    public sealed class PipeIOHeaderDelimitedRpcDomain : RpcDomain
+    public class PipeIOHeaderDelimitedRpcDomain : RpcDomain
     {
         PipeReader Input { get; }
         PipeWriter Output { get; }
-        public PipeIOHeaderDelimitedRpcDomain(PipeReader input,PipeWriter output)
+        public PipeIOHeaderDelimitedRpcDomain(PipeReader input, PipeWriter output)
         {
             Input = input;
             Output = output;
         }
 
-        public ValueTask StartAsync(CancellationToken cancellationToken = default)
+        public Task StartAsync(CancellationToken cancellationToken = default)
         {
 
-            var resolve = ResolveMessagesAsync(cancellationToken);
-            //var send = Task.Run(async () => await SendMessagesAsync(cancellationToken));
-            var send = SendMessagesAsyncThroughPut(65536, cancellationToken);
-            return ValueTaskEx.WhenAll(resolve, send);
+            var resolve = Task.Run(()=> ResolveMessagesAsync(cancellationToken).AsTask(),cancellationToken);
+            //var send = Task.Run(async () => await SendMessagesAsync(cancellationToken)).ConfigureAwait(false);
+            var send = Task.Run(()=> SendMessagesAsyncThroughPut(65536, cancellationToken).AsTask(),cancellationToken);
+            return Task.WhenAll(resolve, send);
         }
 
         async ValueTask SendMessagesAsyncThroughPut(int bufferedMessages = 32, CancellationToken cancellationToken = default)
         {
-            await Task.Yield();
             IAsyncEnumerator<MessageHandle>? enumerator = null;
             try
             {
                 enumerator = MessageChannel.Reader.ReadAllAsync(cancellationToken).GetAsyncEnumerator();
                 var unFlushedMessages = new ArraySegment<MessageHandle>(ArrayPool<MessageHandle>.Shared.Rent(bufferedMessages), 0, bufferedMessages);
-                
+
                 var unFlushedMessagesCount = 0;
                 try
                 {
@@ -55,7 +52,7 @@ namespace RamType0.JsonRpc.Marshaling
                                 WriteMessage(Output, message.SerializedMessage);
                                 if (QueueMessage(unFlushedMessages, message, ref unFlushedMessagesCount))
                                 {
-                                    await Output.FlushAsync(cancellationToken);
+                                    await Output.FlushAsync(cancellationToken).ConfigureAwait(false);
                                     SendComplete(unFlushedMessages);
                                     unFlushedMessagesCount = 0;
                                 }
@@ -67,7 +64,7 @@ namespace RamType0.JsonRpc.Marshaling
                         }
                         else
                         {
-                            await Output.FlushAsync(cancellationToken);
+                            await Output.FlushAsync(cancellationToken).ConfigureAwait(false);
                             SendComplete(unFlushedMessages.AsSpan(..unFlushedMessagesCount));
                             unFlushedMessagesCount = 0;
                             if (await moveNext)
@@ -76,7 +73,7 @@ namespace RamType0.JsonRpc.Marshaling
                                 WriteMessage(Output, message.SerializedMessage);
                                 if (QueueMessage(unFlushedMessages, message, ref unFlushedMessagesCount))
                                 {
-                                    await Output.FlushAsync(cancellationToken);
+                                    await Output.FlushAsync(cancellationToken).ConfigureAwait(false);
                                     SendComplete(unFlushedMessages);
                                     unFlushedMessagesCount = 0;
                                 }
@@ -99,10 +96,10 @@ namespace RamType0.JsonRpc.Marshaling
             {
                 if (!(enumerator is null))
                 {
-                    await enumerator.DisposeAsync();
+                    await enumerator.DisposeAsync().ConfigureAwait(false);
                 }
             }
-            static bool QueueMessage(Span<MessageHandle> queuedHandles,MessageHandle newHandle,ref int count)
+            static bool QueueMessage(Span<MessageHandle> queuedHandles, MessageHandle newHandle, ref int count)
             {
                 ref var dst = ref Unsafe.Add(ref MemoryMarshal.GetReference(queuedHandles), count++);
                 dst = newHandle;
@@ -120,11 +117,10 @@ namespace RamType0.JsonRpc.Marshaling
         }
         async ValueTask SendMessagesAsync(CancellationToken cancellationToken = default)
         {
-            await Task.Yield();
-            await foreach(var message in MessageChannel.Reader.ReadAllAsync(cancellationToken))
+            await foreach (var message in MessageChannel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
                 WriteMessage(Output, message.SerializedMessage);
-                var flushResult = await Output.FlushAsync(cancellationToken);
+                var flushResult = await Output.FlushAsync(cancellationToken).ConfigureAwait(false);
                 if (flushResult.IsCanceled)
                 {
                     break;
@@ -140,13 +136,9 @@ namespace RamType0.JsonRpc.Marshaling
             serializedResponse.CopyTo(span[headerSize..]);
             writer.Advance(headerSize + serializedResponse.Length);
         }
-        async ValueTask ResolveMessagesAsync(CancellationToken cancellationToken = default)
+        public ValueTask ResolveMessagesAsync(CancellationToken cancellationToken = default)
         {
-            await Task.Yield();
-            await foreach (var message in ReadMessageSegmentsAsync(cancellationToken))
-            {
-                _ = ResolveMessageAsync(message);
-            }
+            return ResolveMessagesAsync(ReadMessageSegmentsAsync(), cancellationToken);
         }
 
 

@@ -1,17 +1,10 @@
-﻿using RamType0.JsonRpc.Server;
+﻿
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
-using System.Text;
 using Utf8Json;
-using Utf8Json.Resolvers;
-using Utf8Json.Formatters;
-using System.Collections.Specialized;
-using System.Buffers.Binary;
-using System.Numerics;
-using System.Runtime.Intrinsics.X86;
+
 namespace RamType0.JsonRpc
 {
     public static class MessageParser
@@ -248,7 +241,7 @@ namespace RamType0.JsonRpc
                                     {
                                         try
                                         {
-                                            parseResult.id = ID.Formatter.DeserializeSafe(ref reader);
+                                            parseResult.id = ID.Formatter.DeserializeNullableSafe(ref reader);
                                         }
                                         catch (JsonParsingException)
                                         {
@@ -337,7 +330,7 @@ namespace RamType0.JsonRpc
                                     {
                                         goto InvalidJson;
                                     }
-                                    
+
                                 }
                             UnExpectedFormatProperty:
                                 {
@@ -352,7 +345,7 @@ namespace RamType0.JsonRpc
                                     }
                                     break;
                                 }
-                            
+
 
                         }
                         switch (reader.GetCurrentJsonToken())
@@ -366,7 +359,7 @@ namespace RamType0.JsonRpc
                                 {
                                     return parseResult;
                                 }
-                                
+
                             default:
                                 goto InvalidJson;
                         }
@@ -429,7 +422,7 @@ namespace RamType0.JsonRpc
                 var span = value.AsSpan();
                 writer.EnsureCapacity(span.Length);
                 var writtenBuffer = writer.GetBuffer();
-                var buffer = writtenBuffer.Array!.AsSpan(writtenBuffer.Offset+ writtenBuffer.Count);
+                var buffer = writtenBuffer.Array!.AsSpan(writtenBuffer.Offset + writtenBuffer.Count);
                 span.CopyTo(buffer);
                 writer.AdvanceOffset(span.Length);
             }
@@ -450,7 +443,7 @@ namespace RamType0.JsonRpc
         {
             get
             {
-                return ref Unsafe.As<byte,MessageParseErrors>(ref props[7]);
+                return ref Unsafe.As<byte, MessageParseErrors>(ref props[7]);
             }
 
         }
@@ -461,7 +454,7 @@ namespace RamType0.JsonRpc
             {
                 if (HasParseError)
                 {
-                    if((ParseErrors & MessageParseErrors.IsInvalidJson) != 0)
+                    if ((ParseErrors & MessageParseErrors.IsInvalidJson) != 0)
                     {
                         return MessageKind.InvalidJson;
                     }
@@ -479,34 +472,34 @@ namespace RamType0.JsonRpc
                     else
                     {
 
-                        
-                            if (this[MessagePropertyKind.Method] == PropertyState.Missing)
+
+                        if (this[MessagePropertyKind.Method] == PropertyState.Missing)
+                        {
+                            if (IsValidResultResponse)
                             {
-                                if (IsValidResultResponse)
-                                {
-                                    return MessageKind.ResultResponse;
-                                }
-                                else if (IsValidErrorResponse)
-                                {
-                                    return MessageKind.ErrorResponse;
-                                }
-                                else
-                                {
-                                    return MessageKind.InvalidMessage;
-                                }
+                                return MessageKind.ResultResponse;
+                            }
+                            else if (IsValidErrorResponse)
+                            {
+                                return MessageKind.ErrorResponse;
                             }
                             else
                             {
-                                if (IsValidClientMessage)
-                                {
-                                return MessageKind.ClientMessage;
-                                }
-                                else
-                                {
-                                    return MessageKind.InvalidMessage;
-                                }
+                                return MessageKind.InvalidMessage;
                             }
-                        
+                        }
+                        else
+                        {
+                            if (IsValidClientMessage)
+                            {
+                                return MessageKind.ClientMessage;
+                            }
+                            else
+                            {
+                                return MessageKind.InvalidMessage;
+                            }
+                        }
+
 
 
                     }
@@ -516,12 +509,12 @@ namespace RamType0.JsonRpc
         }
 
         public bool HasParseError => ParseErrors != 0;
-        bool HasInvalidPropertyOrMissingVersion =>    (Bits & 0x0101010101FF) != 2;
-        public bool IsValidClientMessage =>  (Bits & 0x000001FF01FF) == 0x000000020002;
-        public bool IsValidRequest =>        (Bits & 0x000001FFFFFF) == 0x000000020202;
-        public bool IsValidNotification =>   (Bits & 0x000001FFFFFF) == 0x000000020002;
+        bool HasInvalidPropertyOrMissingVersion => (Bits & 0x0101010101FF) != 2;
+        public bool IsValidClientMessage => (Bits & 0x000001FF01FF) == 0x000000020002;
+        public bool IsValidRequest => (Bits & 0x000001FFFFFF) == 0x000000020202;
+        public bool IsValidNotification => (Bits & 0x000001FFFFFF) == 0x000000020002;
         public bool IsValidResultResponse => (Bits & 0xFFFF0000FFFF) == 0x000200000202;
-        public bool IsValidErrorResponse =>  (Bits & 0xFFFF0000FFFF) == 0x020000000202;
+        public bool IsValidErrorResponse => (Bits & 0xFFFF0000FFFF) == 0x020000000202;
         public PropertyState this[MessagePropertyKind propertyKind]
         {
             get
@@ -577,7 +570,7 @@ namespace RamType0.JsonRpc
 
     }
 
-    public enum PropertyState :byte
+    public enum PropertyState : byte
     {
         Missing,
         Invalid,
