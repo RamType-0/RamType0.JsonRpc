@@ -53,7 +53,7 @@ namespace RamType0.JsonRpc
 
         public ValueTask<TResult> RequestAsync(TParams parameters,CancellationToken cancellationToken = default) => RequestAsync<TParams, TResult>(parameters, cancellationToken);
 
-        public ValueTask NotifyAsync(TParams parameters) => NotifyAsync(parameters);
+        public ValueTask NotifyAsync(TParams parameters) => NotifyAsync<TParams>(parameters);
 
     }
 
@@ -67,9 +67,9 @@ namespace RamType0.JsonRpc
         {
         }
 
-        public ValueTask RequestAsync(TParams parameters, CancellationToken cancellationToken = default) => RequestAsync(parameters, cancellationToken);
+        public ValueTask RequestAsync(TParams parameters, CancellationToken cancellationToken = default) => RequestAsync<TParams>(parameters, cancellationToken);
 
-        public ValueTask NotifyAsync(TParams parameters) => NotifyAsync(parameters);
+        public ValueTask NotifyAsync(TParams parameters) => NotifyAsync<TParams>(parameters);
 
     }
 
