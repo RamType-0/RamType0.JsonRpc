@@ -19,10 +19,11 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
+    <PackageReference Include="StreamJsonRpc" Version="2.3.103" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RamType0.JsonRpc.HeaderDelimitedIO\RamType0.JsonRpc.HeaderDelimitedIO.csproj" />
+    <ProjectReference Include="..\RamType0.JsonRpc.IO\RamType0.JsonRpc.IO.csproj" />
   </ItemGroup>
 
 </Project>

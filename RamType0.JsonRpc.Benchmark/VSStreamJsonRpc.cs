@@ -25,8 +25,8 @@ namespace RamType0.JsonRpc.Benchmark
             this.SJRserverRpc.StartListening();
 
             var (aPipes, bPipes) = FullDuplexStream.CreatePipePair();
-            var domainA = new HeaderDelimitedIO.PipeIOHeaderDelimitedRpcDomain(aPipes.Input, aPipes.Output);
-            var domainB = new HeaderDelimitedIO.PipeIOHeaderDelimitedRpcDomain(bPipes.Input, bPipes.Output);
+            var domainA = new IO.PipeIOHeaderDelimitedRpcDomain(aPipes.Input, aPipes.Output);
+            var domainB = new IO.PipeIOHeaderDelimitedRpcDomain(bPipes.Input, bPipes.Output);
             _ = domainA.StartAsync();
             _ = domainB.StartAsync();
             var entry = RpcMethodEntry.FromDelegate<Action>(new Server().NoOp);

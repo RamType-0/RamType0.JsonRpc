@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-namespace RamType0.JsonRpc.HeaderDelimitedIO
+namespace RamType0.JsonRpc.IO
 {
     public class PipeIOHeaderDelimitedRpcDomain : RpcDomain
     {

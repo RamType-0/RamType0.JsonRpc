@@ -22,7 +22,7 @@ namespace RamType0.JsonRpc
         {
             MessageChannel = messageChannel;
             JsonFormatterResolver = formatterResolver;
-            var cancelMethod = RpcMethodEntry.ExplicitParams<CancelParams>(Cancell);
+            var cancelMethod = RpcMethodEntry.ExplicitParams<CancelParams>(Cancel);
             MethodEntries.TryAdd(CancelParams.CancellationMethodName, cancelMethod);
         }
         long id;
@@ -258,7 +258,7 @@ namespace RamType0.JsonRpc
         }
         ConcurrentDictionary<ID, CancellationTokenSource> PendingCancellableRequests { get; } = new ConcurrentDictionary<ID, CancellationTokenSource>();
 
-        internal bool CancellPendingRequest(ID id)
+        internal bool CancelPendingRequest(ID id)
         {
             if (PendingCancellableRequests.TryRemove(id,out var cts))
             {
@@ -271,7 +271,7 @@ namespace RamType0.JsonRpc
             }
         }
 
-        internal void Cancell(CancelParams cancelParams) => CancellPendingRequest(cancelParams.id);
+        internal void Cancel(CancelParams cancelParams) => CancelPendingRequest(cancelParams.id);
 
         CancellationToken AllocCancellationTokenInstance(ID id)
         {

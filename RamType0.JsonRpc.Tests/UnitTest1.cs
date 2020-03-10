@@ -8,7 +8,7 @@ using Utf8Json;
 
 namespace RamType0.JsonRpc.Tests
 {
-    using HeaderDelimitedIO;
+    using IO;
     using System.Threading;
     public class Tests
     {
@@ -107,7 +107,7 @@ namespace RamType0.JsonRpc.Tests
         delegate ValueTask InjectIDAsync([RpcID] ID? id);
 
         [Test]
-        public void CancellByID()
+        public void CancelByID()
         {
             var entry = RpcMethodEntry.FromDelegate<InjectIDAsync>(async id =>
             {

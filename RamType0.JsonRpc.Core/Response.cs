@@ -129,7 +129,7 @@ namespace RamType0.JsonRpc
 
         public static ErrorResponse ParseError(ArraySegment<byte> json)
         {
-            return new ErrorResponse(null, new ResponseError(ErrorCode.ParseError, Encoding.UTF8.GetString(json)));
+            return new ErrorResponse(null, new ResponseError(ErrorCode.ParseError,  "Invalid syntax json. Assigned Json:" +Encoding.UTF8.GetString(json)));
         }
         public static ErrorResponse MethodNotFound(ID requestID, string methodName)
         {

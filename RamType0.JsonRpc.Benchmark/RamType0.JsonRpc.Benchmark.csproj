@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RamType0.JsonRpc.HeaderDelimitedIO\RamType0.JsonRpc.HeaderDelimitedIO.csproj" />
+    <ProjectReference Include="..\RamType0.JsonRpc.IO\RamType0.JsonRpc.IO.csproj" />
   </ItemGroup>
 
 </Project>
